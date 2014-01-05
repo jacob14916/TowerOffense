@@ -1,0 +1,58 @@
+/* CSS declarations go here */
+
+
+.lobby {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  background-color:rgb(60,60,58);
+  color: #FFFFFF;
+  padding: 10px;
+  font: 16px "Courier New";
+  overflow-y: auto;
+}
+
+.nameinput {
+  border: none;
+  width: 100%;
+  margin-left: -10px;
+  padding: 10px;
+  color: #AAAAAA;
+  background-color: black;
+  font: 28px bold "Courier New";
+}
+
+.playerlist {
+  width: 100%;
+  padding: 10px;
+  background-color: #202020;
+  margin-left: -10px;
+  margin-top: 5px;
+}
+
+.playerbutton {
+  font: 18px "Courier New";
+  color: white;
+  border: none;
+  margin: 0;
+  padding: 8px;
+  text-shadow: 2px 2px 10px white;
+  background-color: black;
+}
+
+.playerbutton:hover {
+  background: linear-gradient(0deg, #4066DD, #0055BB);
+}
+
+.playerbutton:active {
+  background: linear-gradient(0deg,  #0055BB, #4066DD 40%, #0055BB);
+}
+
+.challenge {
+  width: 100%;
+  padding: 10px;
+  margin-left: -10px;
+  background-color: #606060;
+}

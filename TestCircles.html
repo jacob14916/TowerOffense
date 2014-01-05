@@ -1,0 +1,53 @@
+<head>
+  <title>TestCircles</title>
+  <link rel="icon" href="/favicon.ico">
+</head>
+
+<body>
+  {{> lobby}}
+</body>
+
+<template name="lobby">
+  {{#if showlobby}}
+  <div class="lobby">
+    Enter thy name:
+      <input type="text" value="{{getname}}" class="nameinput" maxlength="25"/>
+      <br/>
+      Greetings, {{getname}}.
+      <br/> <br/> <br/>
+    {{numconnected}}
+    <div class="playerlist">
+      {{#each playerlist}}
+        {{{makeplayerbutton this}}}
+      {{/each}}
+    </div>
+      <br/> <br/>
+    {{> mychallenge}}
+      <br/> <br/>
+    {{#each challengers}}
+        {{{showchallenger this}}}
+    {{/each}}
+  </div>
+  {{else}}
+    <input type=button name="reshow" value="Re-Show Lobby">
+        {{/if}}
+</template>
+
+<template name="playerbutton">
+  <input type=button class=playerbutton value='{{name}}'> <br>
+</template>
+
+<template name="mychallenge">
+  <div class=challenge>
+      Challenging {{getmychallenge}} : {{status}}.<br> <br>
+    <input type=button class=playerbutton name="cancel" value="Cancel">
+  </div>
+</template>
+
+<template name="challenge">
+  <div class=challenge>
+    {{player_1_name}} has challenged you. <br> <br>
+    <input type=button class=playerbutton name="accept" value="Accept">
+    <input type=button class=playerbutton name="decline" value="Decline">
+  </div> <br> <br>
+</template>
