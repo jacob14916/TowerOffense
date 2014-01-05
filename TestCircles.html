@@ -8,12 +8,11 @@
 </body>
 
 <template name="lobby">
-  {{#if showlobby}}
   <div class="lobby">
     Enter thy name:
       <input type="text" value="{{getname}}" class="nameinput" maxlength="25"/>
       <br/>
-      Greetings, {{getname}}.
+      Greetings, <b>{{getname}}</b>.
       <br/> <br/> <br/>
     {{numconnected}}
     <div class="playerlist">
@@ -27,10 +26,8 @@
     {{#each challengers}}
         {{{showchallenger this}}}
     {{/each}}
+    {{> chat}}
   </div>
-  {{else}}
-    <input type=button name="reshow" value="Re-Show Lobby">
-        {{/if}}
 </template>
 
 <template name="playerbutton">
@@ -39,8 +36,10 @@
 
 <template name="mychallenge">
   <div class=challenge>
-      Challenging {{getmychallenge}} : {{status}}.<br> <br>
-    <input type=button class=playerbutton name="cancel" value="Cancel">
+      Challenging {{getmychallenge}}: <br>{{{status}}}
+      {{#if showcancel}} <br> <br>
+        <input type=button class=playerbutton name="cancel" value="Cancel">
+      {{/if}}
   </div>
 </template>
 
@@ -50,4 +49,16 @@
     <input type=button class=playerbutton name="accept" value="Accept">
     <input type=button class=playerbutton name="decline" value="Decline">
   </div> <br> <br>
+</template>
+
+
+<template name="chat">
+    <div class=chatwrapper>
+        <div class=chat>
+            {{#each messages}}
+            {{{showmessage this}}}
+            {{/each}}
+        </div>
+        <input type="text" class="chatinput" />
+    </div>
 </template>

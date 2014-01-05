@@ -51,11 +51,6 @@ Template.lobby.events({
   'click .nameinput' : function (evt, instance) {
     var node =  instance.find('.nameinput');
     if (node.value == "anonymous") node.value = '';
-  },
-  'click [name=reshow]' : function () {
-    var p_id = Session.get("player_id");
-    var blocking_game = Games.findOne({$or: [{player_1: p_id}, {player_2: p_id}], status: "playing"});
-    if (blocking_game) Games.remove({_id: blocking_game._id});
   }
 });
 
@@ -87,16 +82,56 @@ Template.mychallenge.getmychallenge = function () {
 
 Template.mychallenge.status = function () {
   var game = Games.findOne({player_1: Session.get("player_id")});
-  if (!game) return "Click one of the players in the lobby to challenge them";
+  if (!game) return "<i>Click one of the players in the lobby to challenge them</i>";
   if (game.status == "challenge") return "Pending";
   if (game.status == "declined") return "Declined";
-  if (game.status == "playing") return "Accepted";
+  if (game.status == "playing") return "Accepted - Playing!";
+}
+
+Template.mychallenge.showcancel = function () {
+  return !!Games.findOne({player_1: Session.get("player_id")});
 }
 
 Template.mychallenge.events({
   'click [name=cancel]' : function () {
     var game = Games.findOne({player_1: Session.get("player_id")});
     Games.remove({_id: game._id});
+  }
+});
+
+Template.chat.messages = function () {
+  return Chat.find().fetch().sort(function (a, b) {
+    return a.date.valueOf() - b.date.valueOf(); // oldest to newest
+  });
+}
+
+Template.chat.showmessage = function (msg) {
+  return "<b>" + msg.player_name + "</b>: " + msg.text + "<br>";
+}
+
+Template.chat.preserve([
+  ".chatinput"
+]);
+
+Template.chat.rendered = function () {
+  var div = this.find(".chat");
+  div.scrollTop = div.scrollHeight;
+}
+
+Template.chat.events({
+  'keydown .chatinput' : function (evt, instance) {
+    if (evt.which == 13) {
+      var txt = instance.find(".chatinput");
+      Chat.insert({date: new Date(), text: txt.value, player_id: Session.get("player_id"),
+                   player_name: Session.get("name")}); // will not have reactive names
+      if (Chat.find().count() > 30) { // limit of 30 chats
+        var oldchat = Chat.find().fetch().sort(function (a, b) {
+          return b.date.valueOf() - a.date.valueOf(); // newest to oldest
+        })[30];
+        Meteor.call("clear_older_chats", oldchat.date);
+      }
+      txt.value = "";
+    }
   }
 })
 
@@ -122,6 +157,7 @@ Meteor.startup(
   function () {
     Meteor.subscribe("players");
     Meteor.subscribe("games");
+    Meteor.subscribe("chat");
 
     var player_id = Players.insert({name: 'anonymous', status: 0});
     Session.set("player_id", player_id);
