@@ -21,7 +21,7 @@
   padding: 10px;
   color: #AAAAAA;
   background-color: black;
-  font: 28px bold "Courier New";
+  font: 28px "Courier New";
 }
 
 .playerlist {
@@ -63,12 +63,13 @@
   padding: 10px;
   border: none;
   color: white;
-  background-color: #909090;
+  background-color: #202020;
   font: 16px "Courier New";
 }
 
 .chat {
   overflow-y: auto;
+  resize: vertical;
   width: 100%;
   margin-left: -10px;
   padding: 10px;
@@ -79,4 +80,15 @@
 
 .chatwrapper {
   bottom: 10px;
+}
+
+/*------------------------*/
+
+.gamecontent {
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+  margin-left: 0px;
+  background-color: green;
 }

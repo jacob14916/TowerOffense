@@ -5,7 +5,10 @@
 
 <body>
   {{> lobby}}
+  {{> game}}
 </body>
+
+<!-- ------------------------ -->
 
 <template name="lobby">
   <div class="lobby">
@@ -59,6 +62,14 @@
             {{{showmessage this}}}
             {{/each}}
         </div>
-        <input type="text" class="chatinput" />
+        <input type="text" placeholder="Chat" class="chatinput" />
+    </div>
+</template>
+
+<!-- ------------------------ -->
+
+<template name="game">
+    <div class=gamecontent>
+        Cheese
     </div>
 </template>
