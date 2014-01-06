@@ -43,11 +43,11 @@
 }
 
 .playerbutton:hover {
-  background: linear-gradient(0deg, #4066DD, #0055BB);
+  background: linear-gradient(0deg, #11FFFF, #0099AA);
 }
 
 .playerbutton:active {
-  background: linear-gradient(0deg,  #0055BB, #4066DD 40%, #0055BB);
+  background: linear-gradient(0deg, #008899, #11FFFF);
 }
 
 .challenge {
@@ -78,6 +78,17 @@
   height: 200px;
 }
 
+div.chat a {
+  color: #00BBEE;
+}
+
+div.chat a:hover {
+  color: #11FFFF;
+}
+
+div.chat a:visited {
+  color: #5555CC;
+}
 .chatwrapper {
   bottom: 10px;
 }
