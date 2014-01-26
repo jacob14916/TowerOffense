@@ -133,7 +133,7 @@ Template.chat.events({
       txt.value = "";
     }
   }
-})
+});
 
 //------------------------
 
@@ -150,6 +150,148 @@ var challenge_player = function (pdata) {
   if (oldgame) Games.remove({_id: oldgame._id});
   Games.insert(new Game(Session.get("player_id"), pdata._id));
 }
+
+//------------------------
+
+Template.game.rendered = function () {
+
+}
+
+//------------------------
+
+Engine = function () {
+  this.framestack = [];
+  this.commands = [];
+  this.systems = {};
+  this.command_handlers = {};
+  this.system_cache = {};
+  this.system_data = {};
+  this.graphics_data = {};
+  this.entities = {};
+}
+
+Engine.prototype.tick = function (evt) {
+  var now = new Date();
+  var delta = (now - this.currentFrameTime) || 0;
+  this.currentFrameTime = now;
+  this.stepFrame(delta);
+  this.renderFrame();
+}
+
+Engine.prototype.addEntity = function (ent) {
+  this.entities[ent._id] = ent;
+}
+
+Engine.prototype.insertRemoteCommand = function (cmd) {
+  var found = false;
+  for (var i in this.commmands) {
+    if (this.commands[i]._time < cmd._time) {
+      this.commands.splice(i, 0, cmd);
+      found = true;
+      break;
+    }
+  }
+  if (!found) this.commands.push(cmd);
+  var amtafter = 0;
+  var time;
+  for (var i in this.framestack) {
+    if (this.framestack[i]._time < cmd._time) {
+      amtafter = i;
+      time = this.framestack[i]._time;
+      break;
+    }
+  }
+  this.framestack.splice(0, amtafter);
+  this.entities = $.extend({}, this.framestack[0].entities);
+  this.system_data = $.extend({}, this.framestack[0].system_data);
+  var timediff = this.currentFrameTime - time;
+  var amt_steps = Math.floor(this.timediff / 20); // 50 frames per second
+  for (var i = 0; i < amt_steps; i++) {
+    this.stepFrame(20);
+  }
+  this.stepFrame(this.timediff % 20); // catch up
+}
+
+Engine.prototype.runFrame = function (delta) {
+  var stms = this.system_cache["tick"];
+  for (var i in stms) { //! very slow right now
+    var sys = stms[i];
+    var matching_ents = [];
+    for (var e in this.entities) {
+      var ent = this.entities[e];
+      if (sys.matches(ent)) {
+        matching_ents.push(ent);
+      }
+    }
+    sys.tick(matching_ents, delta);
+  }
+}
+
+Engine.prototype.executeCommand = function (cmd) {
+  this.command_handlers[cmd.type].run(cmd);
+}
+
+Engine.prototype.stepFrame = function (delta, nodump) { // (delta in ms, *dump at end?) -> undefined
+  var last_time = this.framestack[0]._time;
+  var target_time = last_time + delta;
+  var failed_commands = [];
+  for (var i = this.commands.length - 1; i >= 0; i--) { // iterate from oldest
+    var cmd = this.commands[i];
+    if (cmd._time > last_time && cmd._time < last_time + delta) {
+      this.stepFrame(cmd._time - last_time, true);
+      if (!this.executeCommand(cmd)) {
+        failed_commands.push(cmd);
+      }
+      this.dumpFrame(cmd._time);
+      last_time = cmd._time;
+    }
+  }
+  for (var i in failed_commands) {
+    this.commands.splice(this.commands.indexOf(failed_commands[i]), 1);
+  }
+  this.runFrame(delta);
+  if (!nodump) {
+    this.dumpFrame(new Date(target_time));
+  }
+}
+
+Engine.prototype.dumpFrame = function (time) { // (time to stamp) -> undefined
+  var prev = this.reconstructFrame(0);
+  var frame =  this.findChanged({
+    _time: time,
+    entities: this.entities,
+    system_data: this.system_data
+  }, prev || {});
+  this.framestack.splice(0, 0, frame);
+}
+
+Engine.prototype.findChanged = function (after, before) { // (object with changes, object before) -> Object
+  var ret = (Array.prototype.isPrototypeOf(after))?[]:{};
+  for (var i in after) {
+    var n_el = after[i];
+    var o_el = before[i];
+    if (typeof i == "string" && i.charAt(0) == "_") {
+      ret[i] = n_el;
+      continue;
+    }
+    if (n_el != o_el) {
+      if (typeof n_el == "object") {
+        ret[i] = this.findChanged(n_el, o_el || {});
+      } else {
+        ret[i] = n_el;
+      }
+    }
+  }
+  return ret;
+}
+
+Engine.prototype.reconstructFrame = function (which) { // (index to reconstruct) -> that frame, reconstructed
+  if (this.framestack[which]) {
+    return $.extend(true, {}, reconstructFrame(which + 1), this.framestack[which]);
+  }
+  return {};
+}
+
 
 //------------------------
 

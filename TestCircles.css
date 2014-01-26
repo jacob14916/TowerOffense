@@ -100,6 +100,9 @@ div.chat a:visited {
   top: 0px;
   right: 0px;
   bottom: 0px;
-  margin-left: 0px;
+  padding: 0px;
+  z-index: -1;
+  overflow: hidden;
+  margin: 0px;
   background-color: green;
 }
