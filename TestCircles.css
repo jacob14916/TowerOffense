@@ -27,7 +27,7 @@
 .playerlist {
   width: 100%;
   padding: 10px;
-  background-color: #202020;
+  background-image:url("hexabump_2X.png");
   margin-left: -10px;
   margin-top: 5px;
 }
@@ -69,7 +69,6 @@
 
 .chat {
   overflow-y: auto;
-  resize: vertical;
   width: 100%;
   margin-left: -10px;
   padding: 10px;
