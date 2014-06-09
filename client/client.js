@@ -1,4 +1,6 @@
- Template.lobby.greeting = function () {
+// Lobby templates
+
+Template.lobby.greeting = function () {
   return "Welcome to TestCircles.";
 };
 
@@ -54,11 +56,15 @@ Template.lobby.events({
   }
 });
 
+//--------
+
 Template.playerbutton.events({
   'click':function (evt, instance) {
     challenge_player(instance.data);
   }
 });
+
+//--------
 
 Template.challenge.player_1_name = function () {
   return Players.findOne({_id: this.player_1}).name;
@@ -73,6 +79,8 @@ Template.challenge.events({
     Games.update({_id: instance.data._id}, {$set: {status: "declined"}});
   }
 })
+
+//--------
 
 Template.mychallenge.getmychallenge = function () {
   var game = Games.findOne({player_1: Session.get("player_id")});
@@ -98,6 +106,8 @@ Template.mychallenge.events({
     Games.remove({_id: game._id});
   }
 });
+
+//--------
 
 Template.chat.messages = function () {
   return Chat.find().fetch().sort(function (a, b) {
@@ -136,6 +146,7 @@ Template.chat.events({
 });
 
 //------------------------
+// Lobby logic
 
 var challenge_player = function (pdata) {
   if (pdata._id == Session.get("player_id")) {
@@ -152,24 +163,67 @@ var challenge_player = function (pdata) {
 }
 
 //------------------------
+// Game templates
 
 Template.game.rendered = function () {
+  if (!this.hasRendered) {
+    stage = new PIXI.Stage(0xFFFFFF);
+    var containerdiv = this.find(".gamecontent");
+    LogUtils.log(containerdiv);
+    renderer = PIXI.autoDetectRenderer(800,800);
 
+    texture = PIXI.Texture.fromImage("HeavyTurretBlue.png");
+    sprite = new PIXI.Sprite(texture);
+
+    //LogUtils.log(texture, sprite);
+
+    sprite.position.x = 400;
+    sprite.position.y = 400;
+
+    sprite.anchor.x = 0.5;
+    sprite.anchor.y = 0.5;
+
+    stage.addChild(sprite);
+    containerdiv.appendChild(renderer.view);
+    LogUtils.log(renderer);
+    renderer.render(stage);
+
+    E.tick();
+    //E.gatherEvents();
+    //Template.game.events({"mousedown": function(){LogUtils.log("cheese2");}});
+  }
+  this.hasRendered = true;
 }
 
+/*Template.game.events({
+  'click .gamecontent' : function (evt, instance) {
+    LogUtils.log('cheese');
+    /*var localsprite = new PIXI.Sprite(texture);
+    localsprite.x = evt.offsetX;
+    localsprite.y = evt.offsetY;
+    localsprite.anchor.x = 0.5;
+    localsprite.anchor.y = 0.5;
+    localsprite.rotation = Math.random() * 2 * Math.PI;
+    stage.addChild(localsprite);
+    renderer.render(stage); /
+  }
+});*/
+
 //------------------------
+// Game logic
 
 // Note to self:
 // Resume work at "//$" sign
 
 Engine = function () {
   this.framestack = []; // 0 is newest
-  this.commands = []; // 0 is newest
+  this.commands = []; // 0 is newest!!!
   this.systems = {};
   this.command_handlers = {};
   this.system_cache = {};
+  this.renderers = {};
   this.system_data = {};
-  this.graphics_data = {};
+  this.graphics_data = {}; // do I need this?
   this.entities = {};
 }
 
@@ -181,16 +235,74 @@ Engine.prototype.tick = function (evt) {
   this.renderFrame();
 }
 
+Engine.prototype.createEntity = function (components, id) {
+  var ent = {};
+  for (var i in components) {
+    var c = components[i];
+    ent[c.type] = c;
+  }
+  if (id) {
+    ent._id = id;
+  } else {
+    ent._id = Meteor.uuid();
+  }
+  this.addEntity(ent);
+}
+
+Engine.prototype.destroyEntity = function (id) {
+  delete this.entities[id];
+}
+
 Engine.prototype.addEntity = function (ent) {
   this.entities[ent._id] = ent;
 }
 
-Engine.prototype.addSystem = function (sys) {
-  this.systems[sys.type] = sys;
+Engine.prototype.addSystems = function () {
+  for (var i in arguments) {
+    var sys = arguments[i];
+    this.systems[sys.type] = sys;
+  }
 }
 
-Engine.prototype.insertRemoteCommand = function (cmd) {
-  //console.log("insertremotecommand", cmd);
+Engine.prototype.addRenderers = function () {
+  for (var i in arguments) {
+    var sys = arguments[i];
+    this.renderers[sys.type] = sys;
+  }
+}
+
+Engine.prototype.gatherEvents = function () {
+  var events = {};
+  for (var i in this.systems) {
+    if (this.systems[i].events) {
+      var evts = this.systems[i].events();
+      for (var e in evts) {
+        if (events[e]) {
+          events[e].push(evts[e]);
+        } else {
+          events[e] = [evts[e]];
+        }
+      }
+    }
+  }
+  for (var i in events) {
+    var all_evts = events[i];
+    var engine = this;
+    events[i] = function (evt, instance) {
+      for (var e in all_evts) {
+        var cmd = all_evts[e](evt, instance);
+        if (cmd) {
+          engine.commands.splice(0,0,cmd);
+        }
+      }
+      LogUtils.log("Inserted commands for", evt, "commands stack now", engine.commands);
+    }
+  }
+  return events;
+}
+
+Engine.prototype.insertRemoteCommand = function (cmd) { //
+  //LogUtils.log("insertremotecommand", cmd);
   var found = false;
   for (var i in this.commands) {
     if (this.commands[i]._time < cmd._time) {
@@ -200,7 +312,7 @@ Engine.prototype.insertRemoteCommand = function (cmd) {
     }
   }
   if (!found) {
-    //console.log(this.commands)
+    //LogUtils.log(this.commands)
     this.commands.push(cmd);
   }
   var amtafter = 0;
@@ -212,36 +324,43 @@ Engine.prototype.insertRemoteCommand = function (cmd) {
       break;
     }
   }
-  //console.log("time=" + time, "amtafter=" + amtafter);
-  this.framestack.splice(0, amtafter);
+  //LogUtils.log("time=" + time, "amtafter=" + amtafter);
+  this.framestack = [this.reconstructFrame(amtafter)];
   this.entities = $.extend(true, {}, this.framestack[0].entities);
   this.system_data = $.extend(true, {}, this.framestack[0].system_data);
   var timediff = this.currentFrameTime - time;
   var amt_steps = Math.floor(timediff / 200); // 5 frames per second (make 50 later?)
-  //console.log("timediff=" + timediff + ", steps=" + amt_steps);
+  //LogUtils.log("timediff=" + timediff + ", steps=" + amt_steps);
   for (var i = 0; i < amt_steps; i++) {
     this.stepFrame(200);
   }
   this.stepFrame(timediff % 200); // catch up
 }
 
-Engine.prototype.runFrame = function (delta) {
-  //console.log("runframe " + delta);
-  var stms = this.systems;
-  for (var i in stms) { //! very slow right now
-    var sys = stms[i];
-    var matching_ents = [];
-    for (var e in this.entities) {
-      var ent = this.entities[e];
-      if (sys.matches(ent)) {
-        matching_ents.push(ent);
-      }
+Engine.prototype.getMatchingEntities = function (sys) {
+  var matching_ents = {};
+  for (var e in this.entities) {
+    var ent = this.entities[e];
+    if (sys.matches(ent)) {
+      matching_ents[e] = ent;
     }
-    sys.tick(matching_ents, delta);
+  }
+  return matching_ents;
+}
+
+Engine.prototype.runFrame = function (delta) {
+  //LogUtils.log("runframe " + delta);
+  for (var i in this.systems) { //! very slow right now - whatever
+    var sys = this.systems[i];
+    if (!sys.tick) continue;
+    sys.tick(this.getMatchingEntities(sys), delta);
+  }
+  if (this.framestack.length > 10) {
+    this.discardFramesBeforeIndex(10);
   }
 }
 
-Engine.prototype.discardPreviousFrames = function (time) {
+Engine.prototype.discardFramesBeforeTime = function (time) {
   var index = 0;
   for (var i in this.framestack) {
     if (this.framestack[i]._time < time) {
@@ -249,26 +368,67 @@ Engine.prototype.discardPreviousFrames = function (time) {
       break;
     }
   }
-  var frame = this.reconstructFrame(index);
-  this.framestack.splice(index, this.framestack.length - index, frame);
+  this.discardFramesBeforeIndex(index);
 }
 
+Engine.prototype.discardFramesBeforeIndex = function (index) {
+  this.framestack.splice(index + 1, this.framestack.length - index);
+}
+
+/*
+
+Command instruction options:
+- createEntity
+- destroyEntity
+- changeEntityComponentValue
+- changeSystemDataValue
+
+*/
+
 Engine.prototype.executeCommand = function (cmd) {
-  //console.log("executecommand ", cmd);
-  this.command_handlers[cmd.type].run(cmd);
+  LogUtils.log("executeCommand ", cmd);
+  var instructions = [];
+  for (var i in this.systems) {
+    var sys = this.systems[i];
+    if (sys.run && sys.commandMatches(cmd)) {
+      var sys_ins = sys.run(cmd, this.getMatchingEntities(sys));
+      if (sys_ins) {
+        instructions = instructions.concat(sys_ins);
+      } else {
+        return false;
+      }
+    }
+  }
+  for (var i in instructions) {
+    var instruction = instructions[i];
+    if (instruction.createEntity) {
+      this.createEntity(instruction.createEntity);
+    } else if (instruction.destroyEntity) {
+      this.destroyEntity(instruction.destroyEntity);
+    } else if (instruction.changeEntityComponentValue) {
+      var val = instruction.changeEntityComponentValue;
+      this.entities[val.entityId][val.componentType][val.componentField] = val.componentFieldValue;
+    } else if (instruction.changeSystemDataValue) {
+      var val = instruction.changeSystemDataValue;
+      this.system_data[val.systemType][val.systemDataField] = val.systemDataFieldValue;
+    }
+  }
+  return true;
 }
 
 Engine.prototype.stepFrame = function (delta, nodump) { // (delta in ms, *dump at end?) -> undefined
-  //console.log("stepframe " + delta);
+  LogUtils.log("stepFrame " + delta);
   var last_time = (this.framestack.length)?this.framestack[0]._time:this.currentFrameTime;
   var target_time = new Date(last_time.valueOf() + delta);
-  ////console.log(last_time.valueOf(), this.currentFrameTime.valueOf(), target_time.valueOf(), new Date(target_time).valueOf());
+  ////LogUtils.log(last_time.valueOf(), this.currentFrameTime.valueOf(), target_time.valueOf(), new Date(target_time).valueOf());
   var failed_commands = [];
-  for (var i = this.commands.length - 1; i >= 0; i--) { // iterate from oldest
+  for (var i = this.commands.length - 1; i >= 0; i--) { // iterate from oldest to newest
     var cmd = this.commands[i];
-    if (cmd._time > last_time && cmd._time < last_time + delta) {
+    if (cmd._time > last_time && cmd._time < target_time) {
+      LogUtils.log("Attempting to run", cmd);
       this.stepFrame(cmd._time - last_time, true);
       if (!this.executeCommand(cmd)) {
+        LogUtils.log(cmd, "failed");
         failed_commands.push(cmd);
       }
       this.dumpFrame(cmd._time);
@@ -285,86 +445,243 @@ Engine.prototype.stepFrame = function (delta, nodump) { // (delta in ms, *dump a
 }
 
 Engine.prototype.dumpFrame = function (time) { // (time to stamp) -> undefined
-  //console.log("dumpframe @ ", time);
-  var prev = this.reconstructFrame(0);
-  var frame =  this.findChanged({
+  //LogUtils.log("dumpframe @ ", time);
+  this.framestack.splice(0, 0, {
     _time: time,
     entities: this.entities,
     system_data: this.system_data
-  }, prev || {});
-  //console.log(time.valueOf(), frame._time.valueOf());
-  this.framestack.splice(0, 0, frame);
+  });
 }
 
-Engine.prototype.findChanged = function (after, before) { // (object with changes, object before) -> Object
-  var ret = (Array.prototype.isPrototypeOf(after))?[]:{};
-  for (var i in after) {
-    var n_el = after[i];
-    var o_el = before[i];
-    if (typeof i == "string" && i.charAt(0) == "_") {
-      ret[i] = n_el;
-      continue;
-    }
-    if (n_el != o_el) {
-      if (typeof n_el == "object") {
-        ret[i] = this.findChanged(n_el, o_el || {});
-      } else {
-        ret[i] = n_el;
-      }
-    }
-  }
-  return ret;
-}
-
-Engine.prototype.reconstructFrame = function (which) { // (index to reconstruct) -> that frame, reconstructed
-  if (this.framestack[which]) {
-    return $.extend(true, {}, this.reconstructFrame(which + 1), this.framestack[which]);
-  }
-  return {};
+Engine.prototype.reconstructFrame = function (which) { // (index to reconstruct) -> that frame, reconstructed deprecated
+  return this.framestack[which];
 }
 
 Engine.prototype.renderFrame = function () {
-  //console.log("renderframe");
+  var frame = this.reconstructFrame(0);
+  for (var i in this.renderers) {
+    this.renderers[i].render(frame);
+  }
+  renderer.render(stage);
 }
 
-test_system = function (engine) {
-  this.type = "test_system";
+/*
+
+A System defines the following:
+- A constructor taking a single, optional argument (the Engine instance it is added to)
+- A member, engine, that is the Engine instance it is added to
+- A member, type, that is a unique (to that System) string giving the type of the engine. Should be same for all instances of same System.
+- A function, matches, that takes an entity and returns whether the system should process it
+- At least one of the following:
+  - A function, tick, that takes an object of entities and the time in ms to tick by
+  - A function, run, that takes a command and a list of entities potentially relevant to the command's execution
+- No other members for data storage (helper functions are fine)
+- Systems should use engine.system_data for variable data
+
+A Command defines the following:
+- A constructor taking two arguments, data and time (see below)
+- A member, data, that is an object containing data relevant to the command
+- A member, time, that is the Date of the creation of the command
+
+An Entity is an object containing the components that make it up in key-value pairs: component.type : component
+- Also defines a member, _id, which is a unique string or atomic value, usually of the form R123 or B45 (R for red, B for blue)
+
+A Component defines the following:
+- A member, type, that is a unique string (to that Component) giving the type of the Component
+
+*/
+
+TowerRotatorSystem = function (engine) {
+  this.type = "TowerRotator";
   this.engine = engine;
-  this.engine.system_data[this.type] = {testVar: 0};
+  this.engine.system_data[this.type] = {rotationRate: 1}; // 1 rotation per second
 }
 
-test_system.prototype.matches = function (ent) {
-  return ent["test_component"];
+TowerRotatorSystem.prototype.matches = function (ent) {
+  return (ent["Position"] && ent["Position"].rotationAllowed);
 }
 
-test_system.prototype.tick = function (ents) {
-  //console.log(ents)
+TowerRotatorSystem.prototype.tick = function (ents, delta) {
+  var amount = this.engine.system_data[this.type].rotationRate * delta * 2 * Math.PI / 10000;
   for (var i in ents) {
-    if (Math.random() > 0.5) {
-      ents[i].test_component.testVar += Math.floor(Math.random() * 2);
+    var pos = ents[i]["Position"];
+    pos.rotation += amount;
+    if (pos.rotation > Math.PI * 2) {
+      pos.rotation -= Math.PI * 2;
     }
   }
-  this.engine.system_data[this.type].testVar = Math.floor(Math.random() * 2);
 }
 
-test_entity = function (id) {
-  this._id = id;
-  this.test_component = new test_component();
+//--------
+
+PlaceTowerSystem = function (engine) {
+  this.type = "PlaceTower";
+  this.engine = engine;
+  this.engine.system_data[this.type] = {footRadius: 30};
 }
 
-test_component = function () {
-  this.testVar = 0;
+PlaceTowerSystem.prototype.events = function () {
+  var that = this;
+  return {
+    'click .gamecontent' : function (evt) {
+      LogUtils.log("PlaceTower click event", evt);
+      return new PlaceTowerCommand({position: new PIXI.Point(evt.offsetX, evt.offsetY),
+                                    footRadius: that.engine.system_data[that.type].footRadius});
+    }
+  }
 }
 
-test_command = function (time) {
+PlaceTowerSystem.prototype.matches = function (ent) {
+  return (ent["Position"] && ent["Footprint"]);
+}
+
+PlaceTowerSystem.prototype.commandMatches = function (cmd) {
+  return (cmd.type == "PlaceTower");
+}
+
+PlaceTowerSystem.prototype.run = function (cmd, ents) {
+  switch (cmd.type) {
+    case "PlaceTower":
+      LogUtils.log("Placing tower", ents);
+      var pos = cmd.data.position;
+      var fradius = cmd.data.footRadius;
+      for (var i in ents) {
+        var sumFootRadii = ents[i]["Footprint"].radius + fradius;
+        LogUtils.log("Distance^2 between entity "+i+" and attempted placement is " + Geometry.distanceSquared(pos, ents[i]["Position"].position) + "; max is " + sumFootRadii * sumFootRadii);
+        if (Geometry.distanceSquared(pos, ents[i]["Position"].position) < sumFootRadii * sumFootRadii) {
+          LogUtils.log("Failed; distanceSquared = "+Geometry.distanceSquared(pos, ents[i]["Position"].position));
+          return false;
+        }
+      }
+      LogUtils.log("Returning instructions");
+      return [{createEntity: [new PositionComponent(pos, 0, true),
+                              new FootprintComponent(fradius),
+                              new BitmapGraphicsComponent("HeavyTurretBlue.png", true)]}];
+  }
+  return false;
+}
+
+//--------
+
+BitmapGraphicsRenderer = function (engine) {
+  this.type = "BitmapGraphics";
+  this.engine = engine;
+  this.data = {};
+}
+
+BitmapGraphicsRenderer.prototype.render = function (frame) {
+  var destroyed = _.keys(this.data);
+  for (var i in frame.entities) {
+    var ent = frame.entities[i];
+    var pos, bmp;
+    if ((bmp = ent["BitmapGraphics"]) && (pos = ent["Position"])) {
+      if (this.data[ent._id]) {
+        destroyed.splice(destroyed.indexOf(ent._id), 1);
+        var sprite = this.data[ent._id].sprite;
+        if (pos.rotationAllowed) sprite.rotation = pos.rotation;
+        sprite.position.x = pos.position.x;
+        sprite.position.y = pos.position.y;
+      } else {
+        this.data[ent._id] = {};
+        var sprite = new PIXI.Sprite(PIXI.Texture.fromImage(bmp.imageUrl));
+        if (bmp.centered) {
+          sprite.anchor.x = 0.5;
+          sprite.anchor.y = 0.5;
+        }
+        this.data[ent._id].sprite = sprite;
+        stage.addChild(sprite);
+      }
+    }
+  }
+  for (var i in destroyed) {
+    stage.removeChild(this.data[i].sprite);
+    delete this.data[i];
+  }
+}
+
+//--------
+
+PositionComponent = function (position, rotation, rotationAllowed) {
+  this.type = "Position";
+  this.position = position;
+  this.rotation = rotation;
+  this.rotationAllowed = rotationAllowed;
+}
+
+FootprintComponent = function (radius) {
+  this.type = "Footprint";
+  this.radius = radius;
+}
+
+BitmapGraphicsComponent = function (imageUrl, centered) {
+  this.type = "BitmapGraphics";
+  // Assuming these don't change at runtime
+  this.imageUrl = imageUrl;
+  this.centered = centered;
+}
+
+//--------
+
+PlaceTowerCommand = function (data, time) {
   this._time = time || new Date();
-  this.type = "test";
+  this.type = "PlaceTower";
+  this.data = data;
 }
 
-test_command_h =  {run: function () {
-  return true;
-}};
 //------------------------
+// Game utils
+
+Geometry = {};
+
+Geometry.circleRegionsDisjoint = function (c1, r1, c2, r2) {
+  var sum_radii = r1 + r2;
+  return Geometry.distanceSquared(c1, c2) > sum_radii * sum_radii;
+}
+
+Geometry.distance = function (pt1, pt2) {
+  return Math.sqrt(Geometry.distanceSquared(pt1, pt2));
+}
+
+Geometry.distanceSquared = function (pt1, pt2) {
+  var dx = pt1.x - pt2.x, dy = pt1.y - pt2.y;
+  return dx * dx + dy * dy;
+}
+
+Geometry.randomAngle = function () { // Random is unacceptable for deterministic gameplay
+  return Math.random() * 2 * Math.PI;
+}
+
+LogUtils = {
+  enabled: true
+};
+
+LogUtils.nth = function (n) {
+  var strn = n.toString();
+  if (strn.length == 2) return strn + "th";
+  var lastChar = strn.charAt(strn.length - 1);
+  switch (lastChar) {
+    case "1":
+      return strn + "st";
+    case "2":
+      return strn + "nd";
+    case "3":
+      return strn + "rd";
+    default:
+      return strn + "th";
+  }
+}
+
+LogUtils.log = function () {
+  if (this.enabled) {
+    console.log.apply(console, arguments);
+  }
+}
+//------------------------
+
+E = new Engine();
+E.addSystems(new PlaceTowerSystem(E), new TowerRotatorSystem(E));
+E.addRenderers(new BitmapGraphicsRenderer(E));
+Template.game.events(E.gatherEvents()); //Yes!
 
 Meteor.startup(
   function () {
@@ -377,11 +694,8 @@ Meteor.startup(
     Meteor.call('register_player_connection', player_id);
     Session.set("name", "anonymous");
 
-    E = new Engine();
-    E.addSystem(new test_system(E));
-    E.addEntity(new test_entity(1));
-    E.addEntity(new test_entity(3));
-    E.command_handlers["test"] = test_command_h;
+
+    //E.tick();
     //Meteor.setInterval(function(){E.tick()}, 1000);
   }
 )

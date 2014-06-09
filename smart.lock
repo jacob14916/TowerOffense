@@ -1,7 +1,15 @@
 {
   "meteor": {},
   "dependencies": {
-    "basePackages": {},
-    "packages": {}
+    "basePackages": {
+      "pixijs": {}
+    },
+    "packages": {
+      "pixijs": {
+        "git": "https://github.com/foxdog-studios/meteor-pixijs",
+        "tag": "v0.0.1",
+        "commit": "5b69d345dc99204d1569c31b693ad6ac395e5cf2"
+      }
+    }
   }
 }
