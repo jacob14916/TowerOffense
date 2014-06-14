@@ -20,14 +20,14 @@
     {{numconnected}}
     <div class="playerlist">
       {{#each playerlist}}
-        {{{makeplayerbutton this}}}
+        {{> playerbutton this}}
       {{/each}}
     </div>
       <br/> <br/>
     {{> mychallenge}}
       <br/> <br/>
     {{#each challengers}}
-        {{{showchallenger this}}}
+        {{> challenge this}}
     {{/each}}
     {{> chat}}
   </div>

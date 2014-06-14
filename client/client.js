@@ -119,10 +119,6 @@ Template.chat.showmessage = function (msg) {
   return "<b>" + msg.player_name + "</b>: " + msg.text + "<br>";
 }
 
-Template.chat.preserve([
-  ".chatinput"
-]);
-
 Template.chat.rendered = function () {
   var div = this.find(".chat");
   div.scrollTop = div.scrollHeight;
@@ -166,48 +162,16 @@ var challenge_player = function (pdata) {
 // Game templates
 
 Template.game.rendered = function () {
-  if (!this.hasRendered) {
-    stage = new PIXI.Stage(0xFFFFFF);
-    var containerdiv = this.find(".gamecontent");
-    LogUtils.log(containerdiv);
-    renderer = PIXI.autoDetectRenderer(800,800);
+  stage = new PIXI.Stage(0xFFFFFF);
+  var containerdiv = this.find(".gamecontent");
+  renderer = PIXI.autoDetectRenderer(800,800);
 
-    texture = PIXI.Texture.fromImage("HeavyTurretBlue.png");
-    sprite = new PIXI.Sprite(texture);
+  containerdiv.appendChild(renderer.view);
+  LogUtils.log(renderer);
+  renderer.render(stage);
 
-    //LogUtils.log(texture, sprite);
-
-    sprite.position.x = 400;
-    sprite.position.y = 400;
-
-    sprite.anchor.x = 0.5;
-    sprite.anchor.y = 0.5;
-
-    stage.addChild(sprite);
-    containerdiv.appendChild(renderer.view);
-    LogUtils.log(renderer);
-    renderer.render(stage);
-
-    E.tick();
-    //E.gatherEvents();
-    //Template.game.events({"mousedown": function(){LogUtils.log("cheese2");}});
-  }
-  this.hasRendered = true;
+  E.tick();
 }
-
-/*Template.game.events({
-  'click .gamecontent' : function (evt, instance) {
-    LogUtils.log('cheese');
-    /*var localsprite = new PIXI.Sprite(texture);
-    localsprite.x = evt.offsetX;
-    localsprite.y = evt.offsetY;
-    localsprite.anchor.x = 0.5;
-    localsprite.anchor.y = 0.5;
-    localsprite.rotation = Math.random() * 2 * Math.PI;
-    stage.addChild(localsprite);
-    renderer.render(stage); /
-  }
-});*/
 
 //------------------------
 // Game logic
@@ -244,7 +208,7 @@ Engine.prototype.createEntity = function (components, id) {
   if (id) {
     ent._id = id;
   } else {
-    ent._id = Meteor.uuid();
+    ent._id = Meteor.uuid(); // Should not be invoked
   }
   this.addEntity(ent);
 }
@@ -271,37 +235,46 @@ Engine.prototype.addRenderers = function () {
   }
 }
 
-Engine.prototype.gatherEvents = function () {
-  var events = {};
+Engine.prototype.gatherEvents = function () { // meteor does not play well with key events
+  var meteor_events = {}, final_meteor_events = {}, key_events = {};
   for (var i in this.systems) {
     if (this.systems[i].events) {
-      var evts = this.systems[i].events();
-      for (var e in evts) {
-        if (events[e]) {
-          events[e].push(evts[e]);
+      var sys_evts = this.systems[i].events();
+      for (var e in sys_evts) {
+        var evt_object = meteor_events;
+        if (e.length > 3 && e.slice(0,3) == "key") {
+          evt_object = key_events;
+        }
+        if (evt_object[e]) {
+          evt_object[e].push(sys_evts[e]);
         } else {
-          events[e] = [evts[e]];
+          evt_object[e] = [sys_evts[e]];
         }
       }
     }
   }
-  for (var i in events) {
-    var all_evts = events[i];
-    var engine = this;
-    events[i] = function (evt, instance) {
-      for (var e in all_evts) {
-        var cmd = all_evts[e](evt, instance);
-        if (cmd) {
-          engine.commands.splice(0,0,cmd);
-        }
-      }
-      LogUtils.log("Inserted commands for", evt, "commands stack now", engine.commands);
-    }
+  for (var i in key_events) {
+    window.addEventListener(i, this.makeEventHandler(key_events[i], i));
   }
-  return events;
+  for (var i in meteor_events) {
+    final_meteor_events[i] = this.makeEventHandler(meteor_events[i], i);
+  }
+  return final_meteor_events;
 }
 
-Engine.prototype.insertRemoteCommand = function (cmd) { //
+Engine.prototype.makeEventHandler = function (sys_evt_handlers, type) {
+  var engine = this;
+  return function (evt, instance) {
+    for (var e in sys_evt_handlers) {
+      var cmd = sys_evt_handlers[e](evt, instance);
+      if (cmd) {
+        engine.commands.splice(0,0,cmd);
+      }
+    }
+  }
+}
+
+Engine.prototype.insertRemoteCommand = function (cmd) { //$ work on next
   //LogUtils.log("insertremotecommand", cmd);
   var found = false;
   for (var i in this.commands) {
@@ -360,7 +333,7 @@ Engine.prototype.runFrame = function (delta) {
   }
 }
 
-Engine.prototype.discardFramesBeforeTime = function (time) {
+Engine.prototype.discardFramesBeforeTime = function (treconstrucime) {
   var index = 0;
   for (var i in this.framestack) {
     if (this.framestack[i]._time < time) {
@@ -471,12 +444,13 @@ A System defines the following:
 - A constructor taking a single, optional argument (the Engine instance it is added to)
 - A member, engine, that is the Engine instance it is added to
 - A member, type, that is a unique (to that System) string giving the type of the engine. Should be same for all instances of same System.
+- A member, local_data, that contains data that matters only to the current client
 - A function, matches, that takes an entity and returns whether the system should process it
 - At least one of the following:
   - A function, tick, that takes an object of entities and the time in ms to tick by
   - A function, run, that takes a command and a list of entities potentially relevant to the command's execution
 - No other members for data storage (helper functions are fine)
-- Systems should use engine.system_data for variable data
+- Systems should use engine.system_data for variable data that should be same between clients
 
 A Command defines the following:
 - A constructor taking two arguments, data and time (see below)
@@ -494,22 +468,63 @@ A Component defines the following:
 TowerRotatorSystem = function (engine) {
   this.type = "TowerRotator";
   this.engine = engine;
-  this.engine.system_data[this.type] = {rotationRate: 1}; // 1 rotation per second
+  this.engine.system_data[this.type] = {rotationRate: 0.1}; // 0.1 rotations per second
 }
 
 TowerRotatorSystem.prototype.matches = function (ent) {
-  return (ent["Position"] && ent["Position"].rotationAllowed);
+  return (ent["TowerRotation"] && ent["Position"]);
+}
+
+TowerRotatorSystem.prototype.commandMatches = function (cmd) {
+  return (cmd.type == "MultiplyRotationRate");
+}
+
+TowerRotatorSystem.prototype.run = function (cmd) {
+  var systype = this.type;
+  switch (cmd.type) {
+    case "MultiplyRotationRate":
+      var newRate = this.engine.system_data[systype].rotationRate * cmd.data.factor;
+      if (newRate < 10 && newRate > 0.001) {
+        return [{
+            changeSystemDataValue: {
+              systemType: systype,
+              systemDataField: "rotationRate",
+              systemDataFieldValue: newRate
+            }
+          }];
+      }
+  }
+  return false;
 }
 
 TowerRotatorSystem.prototype.tick = function (ents, delta) {
-  var amount = this.engine.system_data[this.type].rotationRate * delta * 2 * Math.PI / 10000;
+  var twopi = Math.PI * 2;
+  var amount = this.engine.system_data[this.type].rotationRate * delta * twopi / 1000;
   for (var i in ents) {
-    var pos = ents[i]["Position"];
-    pos.rotation += amount;
-    if (pos.rotation > Math.PI * 2) {
-      pos.rotation -= Math.PI * 2;
+    var ent = ents[i];
+    var pos = ent["Position"];
+    pos.rotation += amount * ent["TowerRotation"].factor;
+    if (pos.rotation > twopi) {
+      pos.rotation -= twopi;
+    } else if (pos.rotation < 0) {
+      pos.rotation += twopi;
     }
   }
+}
+
+TowerRotatorSystem.prototype.events = function () {
+  return {
+    'keydown' : function (evt) {
+      switch (evt.which) {
+        case 187: // +, = button
+          return new MultiplyRotationRateCommand({factor: 2});
+        case 189: // -, _ button
+          return new MultiplyRotationRateCommand({factor: 0.5});
+        default:
+          break;
+      }
+    }
+  };
 }
 
 //--------
@@ -517,16 +532,38 @@ TowerRotatorSystem.prototype.tick = function (ents, delta) {
 PlaceTowerSystem = function (engine) {
   this.type = "PlaceTower";
   this.engine = engine;
-  this.engine.system_data[this.type] = {footRadius: 30};
+  this.local_data = {
+    footRadius: 30,
+    towerTypes: ["HeavyTurret", "MachineGun", "Sniper", "Turret"],
+    towerRotationFactors: [1, -2, -1, 2],
+    towerIndex: 0,
+    towerColors: ["Blue", "Red"],
+    colorIndex: 0
+  };
 }
 
 PlaceTowerSystem.prototype.events = function () {
   var that = this;
+  LogUtils.log(that.local_data.towerTypes[that.local_data.towerIndex] +
+                                      that.local_data.towerColors[that.local_data.colorIndex] + ".png");
   return {
     'click .gamecontent' : function (evt) {
-      LogUtils.log("PlaceTower click event", evt);
       return new PlaceTowerCommand({position: new PIXI.Point(evt.offsetX, evt.offsetY),
-                                    footRadius: that.engine.system_data[that.type].footRadius});
+                                    footRadius: that.local_data.footRadius,
+                                    rotationFactor: that.local_data.towerRotationFactors[that.local_data.towerIndex],
+                                    towerUrl: that.local_data.towerTypes[that.local_data.towerIndex] +
+                                      that.local_data.towerColors[that.local_data.colorIndex] + ".png"});
+    },
+    'keydown' : function (evt) {
+      switch (evt.which) {
+        case 67: // c
+          that.local_data.colorIndex = (that.local_data.colorIndex + 1) % 2;
+          break;
+        case 88: // x
+          that.local_data.towerIndex = (that.local_data.towerIndex + 1) % 4;
+          break;
+      }
+      return false;
     }
   }
 }
@@ -553,10 +590,10 @@ PlaceTowerSystem.prototype.run = function (cmd, ents) {
           return false;
         }
       }
-      LogUtils.log("Returning instructions");
-      return [{createEntity: [new PositionComponent(pos, 0, true),
+      return [{createEntity: [new PositionComponent(pos, 0),
+                              new TowerRotationComponent(cmd.data.rotationFactor),
                               new FootprintComponent(fradius),
-                              new BitmapGraphicsComponent("HeavyTurretBlue.png", true)]}];
+                              new BitmapGraphicsComponent(cmd.data.towerUrl, true)]}];
   }
   return false;
 }
@@ -566,46 +603,53 @@ PlaceTowerSystem.prototype.run = function (cmd, ents) {
 BitmapGraphicsRenderer = function (engine) {
   this.type = "BitmapGraphics";
   this.engine = engine;
-  this.data = {};
+  this.local_data = {};
 }
 
 BitmapGraphicsRenderer.prototype.render = function (frame) {
-  var destroyed = _.keys(this.data);
+  var destroyed = _.keys(this.local_data);
   for (var i in frame.entities) {
     var ent = frame.entities[i];
     var pos, bmp;
     if ((bmp = ent["BitmapGraphics"]) && (pos = ent["Position"])) {
-      if (this.data[ent._id]) {
+      if (this.local_data[ent._id]) {
         destroyed.splice(destroyed.indexOf(ent._id), 1);
-        var sprite = this.data[ent._id].sprite;
-        if (pos.rotationAllowed) sprite.rotation = pos.rotation;
+        var sprite = this.local_data[ent._id].sprite;
+        sprite.rotation = pos.rotation;
         sprite.position.x = pos.position.x;
         sprite.position.y = pos.position.y;
       } else {
-        this.data[ent._id] = {};
+        this.local_data[ent._id] = {};
         var sprite = new PIXI.Sprite(PIXI.Texture.fromImage(bmp.imageUrl));
         if (bmp.centered) {
           sprite.anchor.x = 0.5;
           sprite.anchor.y = 0.5;
         }
-        this.data[ent._id].sprite = sprite;
+        sprite.rotation = pos.rotation;
+        sprite.position.x = pos.position.x;
+        sprite.position.y = pos.position.y;
+        this.local_data[ent._id].sprite = sprite;
         stage.addChild(sprite);
       }
     }
   }
   for (var i in destroyed) {
-    stage.removeChild(this.data[i].sprite);
-    delete this.data[i];
+    stage.removeChild(this.local_data[i].sprite);
+    delete this.local_data[i];
   }
 }
 
 //--------
 
-PositionComponent = function (position, rotation, rotationAllowed) {
+PositionComponent = function (position, rotation) {
   this.type = "Position";
   this.position = position;
   this.rotation = rotation;
-  this.rotationAllowed = rotationAllowed;
+}
+
+TowerRotationComponent = function (factor) {
+  this.type = "TowerRotation";
+  this.factor = factor;
 }
 
 FootprintComponent = function (radius) {
@@ -625,6 +669,12 @@ BitmapGraphicsComponent = function (imageUrl, centered) {
 PlaceTowerCommand = function (data, time) {
   this._time = time || new Date();
   this.type = "PlaceTower";
+  this.data = data;
+}
+
+MultiplyRotationRateCommand = function (data, time) {
+  this._time = time || new Date();
+  this.type = "MultiplyRotationRate";
   this.data = data;
 }
 
@@ -682,6 +732,7 @@ E = new Engine();
 E.addSystems(new PlaceTowerSystem(E), new TowerRotatorSystem(E));
 E.addRenderers(new BitmapGraphicsRenderer(E));
 Template.game.events(E.gatherEvents()); //Yes!
+Template.lobby.events({'keydown':function (evt) {LogUtils.log(evt);}});
 
 Meteor.startup(
   function () {
