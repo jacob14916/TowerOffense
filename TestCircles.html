@@ -69,6 +69,17 @@
 <!-- ------------------------ -->
 
 <template name="game">
-    <div class=gamecontent>
+    <div class=game>
+        {{> gameui}}
+        <div class=gamecontent>
+        </div>
+    </div>
+</template>
+
+<template name="gameui">
+    <div class=gameui>
+        <div class=uibox style="background-color:{{client_color}};width:40px"> </div>
+        <div class=uibox> Resources: {{resource_amount}}</div>
+        <a href="HowToPlay.txt" target="blank">How to Play</a>
     </div>
 </template>

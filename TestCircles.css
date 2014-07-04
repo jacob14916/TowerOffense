@@ -77,16 +77,16 @@
   height: 200px;
 }
 
-div.chat a {
+a {
   color: #00BBEE;
 }
 
-div.chat a:hover {
+a:hover {
   color: #11FFFF;
 }
 
-div.chat a:visited {
-  color: #5555CC;
+a:visited {
+  color: #6666FF;
 }
 .chatwrapper {
   bottom: 10px;
@@ -94,7 +94,7 @@ div.chat a:visited {
 
 /*------------------------*/
 
-.gamecontent {
+.game {
   position: absolute;
   top: 0px;
   right: 0px;
@@ -105,4 +105,34 @@ div.chat a:visited {
   overflow: hidden;
   margin-left: 10px;
   background-color: green;
+}
+
+.gamecontent {
+  /*overflow: auto;*/
+  position: relative;
+
+  margin-top: 20px;
+  padding: 0px;
+}
+
+.gameui {
+  position: relative;
+  top: 0px;
+  right: 0px;
+  left: 0px;
+  height: 80px;
+  margin-bottom: 10px;
+  background-color: rgb(60,60,58);
+  padding: 10px;
+}
+
+.uibox {
+  position: relative;
+  font: 16px "Courier New";
+  color: white;
+  float: left;
+  padding: 10px;
+  height: calc(100% - 20px);
+  margin-right: 10px;
+  background-color: #606060;
 }

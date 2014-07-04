@@ -36,6 +36,9 @@ Meteor.publish("games", function () {
   return Games.find();
 })
 
+Meteor.publish("commands", function () {
+  return Commands.find();
+})
 
 Meteor.publish("chat", function () {
   return Chat.find();
