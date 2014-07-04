@@ -5,11 +5,11 @@ GUESS_LATENCY = 100; // guess 100 ms for other client to respond
 
 START_DATA = {
   1: {
-    position: new PIXI.Point(200,200),
+    position: new PIXI.Point(0,-1000),
     id: "StartTower1"
   },
   2: {
-    position: new PIXI.Point(600,600),
+    position: new PIXI.Point(0,1000),
     id: "StartTower2"
   }
 }
@@ -234,6 +234,12 @@ start_game = function (id, color) {
   game_handle.loopHandle = requestAnimationFrame(anim_handler);
   game_handle.observeHandle = observe_handle;
   game_handle._id = id;
+
+  var pos = START_DATA[Colors.number(color)].position;
+  var x = Math.floor(Renderer.width/2 - pos.x), y = Math.floor(Renderer.height/2 - pos.y);
+  world_offset_x = x; World.position.x = x;
+  world_offset_y = y; World.position.y = y;
+
   game_handle.playing = true;
 }
 
@@ -297,6 +303,20 @@ Template.gameui.client_color = function () {
 
 Template.gameui.resource_amount = function () {
   return Session.get("resourceAmount") || 0;
+}
+
+Template.gameui.towerurl = function () {
+  var towertype = Session.get("tower_type");
+  return (towertype && E.active)?towertype + E.client_color + ".png":"PylonRed.png";
+}
+
+Template.gameui.seltowerurl = function () {
+  var towerUrl = Session.get("seltower_url");
+  return (towerUrl && E.active)?towerUrl:"PylonRed.png";
+}
+
+Template.gameui.towercost = function () {
+  return Session.get("tower_cost");
 }
 
 //------------------------
@@ -449,7 +469,6 @@ Engine.prototype.insertRemoteCommand = function (cmd) {
   for (var i in this.framestack) {
     if (this.framestack[i]._time < cmd._time) {
       amtafter = i;
-      LogUtils.log("Frame #", i);
       time = this.framestack[i]._time;
       break;
     }
@@ -709,10 +728,11 @@ PlaceTowerSystem = function (engine) {
 PlaceTowerSystem.prototype.startup = function () {
   this.local_data = {
     footRadius: 30,
-    towerTypes: ["Pylon", "HeavyTurret", "MachineGun", "Sniper", "Turret"],
+    towerTypes: ["Pylon", "Miner", "HeavyTurret", "MachineGun", "Sniper", "Turret"],
     towerData: {
       Pylon: {
         type: "Pylon",
+        cost: 50,
         activeLink: true,
         linkRadius: 150,
         health: 100,
@@ -720,8 +740,18 @@ PlaceTowerSystem.prototype.startup = function () {
         footRadius: 21,
         nonattacking: true
       },
+      Miner: {
+        type: "Miner",
+        cost: 25,
+        health: 40,
+        healthRegen: 1,
+        mining: true,
+        miningRate: 0.1,
+        miningRadius: 200
+      },
       HeavyTurret: {
         type: "HeavyTurret",
+        cost: 250,
         health: 200,
         healthRegen: 1,
         attackRadius: 300,
@@ -731,6 +761,7 @@ PlaceTowerSystem.prototype.startup = function () {
       },
       MachineGun: {
         type: "MachineGun",
+        cost: 200,
         health: 150,
         healthRegen: 3,
         attackRadius: 200,
@@ -740,30 +771,36 @@ PlaceTowerSystem.prototype.startup = function () {
       },
       Sniper: {
         type: "Sniper",
+        cost: 300,
         health: 100,
         healthRegen: 1,
-        attackRadius: 500,
-        attackRegen: 1.2,
+        attackRadius: 400,
+        attackRegen: 1,
         attackDamage: 15,
         bulletSpeed: 500
       },
       Turret: {
         type: "Turret",
+        cost: 50,
         health: 100,
         healthRegen: 2,
-        attackRadius: 200,
+        attackRadius: 250,
         attackRegen: 1,
-        attackDamage: 10,
+        attackDamage: 12,
         bulletSpeed: 200
       }
     },
     towerIndex: 0,
   };
+  var type = this.local_data.towerTypes[0];
+  Session.set("tower_type", type);
+  Session.set("tower_cost", this.local_data.towerData[type].cost);
   var start_commands = [], that = this;
   Colors.forEachColor(function (color, i) {
     start_commands.push(new PlaceTowerCommand({
       position: START_DATA[i].position.clone(),
       footRadius: 48,
+      cost: 0,
       type: "HQ",
       overrideId: START_DATA[i].id,
       isRoot: true,
@@ -788,14 +825,19 @@ PlaceTowerSystem.prototype.events = function () {
         return new PlaceTowerCommand(data, that.engine.client_color);
       }
     },
-    'keydown' : function (evt) {
-      if (evt.target.tagName == "INPUT") return false;
-      switch (evt.which) {
-        case 88: // x
-          that.local_data.towerIndex = (that.local_data.towerIndex + 1) % 5;
-          break;
-      }
-      return false;
+    'click [name=next_tower]' : function (evt) {
+      var i = (that.local_data.towerIndex + 1) % 6;
+      var type = that.local_data.towerTypes[i];
+      that.local_data.towerIndex = i;
+      Session.set("tower_type", type);
+      Session.set("tower_cost", that.local_data.towerData[type].cost);
+    },
+    'click [name=prev_tower]' : function (evt) {
+      var i = (that.local_data.towerIndex + 5) % 6;
+      var type = that.local_data.towerTypes[i];
+      that.local_data.towerIndex = i;
+      Session.set("tower_type", type);
+      Session.set("tower_cost", that.local_data.towerData[type].cost);
     }
   }
 }
@@ -813,7 +855,6 @@ PlaceTowerSystem.prototype.run = function (cmd, ents) {
     case "PlaceTower":
       var data = cmd.data;
       var pos = data.position, fradius = data.footRadius || this.local_data.footRadius;
-      LogUtils.log(fradius);
       for (var i in ents) {
         var sumFootRadii = ents[i]["Footprint"].radius + fradius;
         if (Geometry.distanceSquared(pos, ents[i]["Position"].position) < sumFootRadii * sumFootRadii) {
@@ -826,14 +867,17 @@ PlaceTowerSystem.prototype.run = function (cmd, ents) {
                         new BitmapGraphicsComponent(towerUrl, true),
                         new ColorComponent(cmd.color),
                         new HealthComponent(data.health, data.healthRegen),
-                        new MiningComponent(0.2, 300),
+                        new CostComponent(data.cost),
                         new LinkageComponent(data.linkRadius, data.activeLink, data.isRoot)];
       if (!data.nonattacking) {
         components.push(new AttackComponent(data.attackDamage, data.attackRadius, data.attackRegen, data.bulletSpeed, 32, data.type + "Bullet"));
       }
+      if (data.mining) {
+        components.push(new MiningComponent(data.miningRate, data.miningRadius));
+      }
       return [{createEntity:
                {components: components,
-                _id: data.overrideId}}];
+                _id: data.overrideId || Utils.positionToString(pos)}}];
   }
   return false;
 }
@@ -872,7 +916,6 @@ TowerLinkageSystem.prototype.matches = function (ent) {
 
 TowerLinkageSystem.prototype.tick = function (ents, delta, wasChange) {
   if (wasChange) {
-    LogUtils.log("Linkage graphics data dirty");
     this.clearLinks(ents);
     this.local_data.dirty = true;
     var that = this;
@@ -1198,6 +1241,25 @@ HealthSystem.prototype.tick = function (ents, delta) {
   }
 }
 
+HealthSystem.prototype.commandMatches = function (cmd) {
+  return cmd.type == "SalvageTower";
+}
+
+HealthSystem.prototype.run = function (cmd) {
+  switch (cmd.type) {
+    case "SalvageTower":
+      if (!this.engine.entities[cmd.data.id]) return false;
+      return [{
+        changeEntityComponentValue: {
+          entityId: cmd.data.id,
+          componentType: "Health",
+          componentField: "hp",
+          componentFieldValue: -1
+        }
+      }];
+  }
+}
+
 HealthSystem.prototype.render = function (frame) {
   var bargfx = this.local_data.hbGraphics;
   bargfx.clear();
@@ -1227,73 +1289,132 @@ ResourcesSystem = function (engine) {
 }
 
 ResourcesSystem.prototype.startup = function () {
-  var colorAmounts = {};
+  var data = {wasCircleRemoved: false, circles: {}};
   Colors.forEachColor(function (color) {
-    colorAmounts[color] = 300;
-  })
-  this.engine.system_data[this.type] = {
-    circles: [
-      {position: new PIXI.Point(400,400), amount: 1600, radius: 40},
-      {position: new PIXI.Point(0,0), amount: 400, radius: 20},
-      {position: new PIXI.Point(800,800), amount: 400, radius: 20}
-    ],
-    colorAmounts: colorAmounts
+    data["colorAmounts"+color] = 300;
+  });
+  var circle = function (x, y, amt) {
+    return {
+      position: new PIXI.Point(x, y),
+      amount: amt,
+      radius: Math.sqrt(amt),
+      _id: Meteor.uuid()
+    };
   };
+  var addCircle = function (x, y, amt) {
+    var c = circle(x, y, amt);
+    data.circles[c._id] = c;
+  }
+  addCircle(0, -1200, 3600); addCircle(0, 1200, 3600);
+  for (var i = 0; i < 9; i++) {
+    for (var j = 0; j < 9; j++) {
+      addCircle((i - 4) * 300, (j - 4) * 200, 100);
+    };
+  }
+  this.engine.system_data[this.type] = data;
   var resourceGraphics = new PIXI.Graphics();
+  var miningGraphics = new PIXI.Graphics();
   var resourceLayer = new PIXI.DisplayObjectContainer();
+  resourceLayer.addChild(miningGraphics);
   resourceLayer.addChild(resourceGraphics);
   World.addChild(resourceLayer);
   this.local_data = {
     resourceLayer: resourceLayer,
     resourceGraphics: resourceGraphics,
+    miningGraphics: miningGraphics,
+    mgDirty: false,
     lastDisplayTime: 0
   };
 }
 
 ResourcesSystem.prototype.matches = function (ent) {
-  return !!(ent["Mining"] && ent["Position"] && ent["Color"]);
+  return !!(ent["Mining"] && ent["Linkage"] && ent["Position"] && ent["Color"]);
 }
 
-ResourcesSystem.prototype.tick = function (ents, delta) {
-  var delta_secs = delta / 1000;
+ResourcesSystem.prototype.tick = function (ents, delta, wasChange) {
   var sys_data = this.engine.system_data[this.type];
   var circles = sys_data.circles;
-  var amounts_removed = [];
+  if (sys_data.empty) return;
+  var delta_secs = delta / 1000,
+      amounts_removed = {};
+  if (wasChange || sys_data.wasCircleRemoved) {
+    LogUtils.log("wasChange", wasChange, "wasCircleRemoved", sys_data.wasCircleRemoved);
+    this.local_data.mgDirty = true;
+    sys_data.wasCircleRemoved = false;
+    for (var i in ents) {
+      var ent = ents[i];
+      if (!(ent["Linkage"].isLinked || ent["Linkage"].isRoot)) continue;
+      var pos = ent["Position"].position, r2 = Math.pow(ent["Mining"].radius, 2);
+      ent["Mining"].miningFrom = _.pluck(_.filter(circles, function (circle) {
+        return Geometry.distanceSquared(circle.position, pos) <= r2;
+      }), "_id");
+    }
+  }
   for (var i in ents) {
     var ent = ents[i];
     var rate = ent["Mining"].rate * delta_secs,
-        radius = ent["Mining"].radius,
-        pos = ent["Position"].position,
-        color = ent["Color"].color;
-    var r2 = Math.pow(radius, 2);
-    for (var j in circles) {
-      var circle = circles[j];
-      if (Geometry.distanceSquared(circle.position, pos) <= r2) {
-        var amt = rate * circle.amount;
-        amounts_removed[j] = amounts_removed[j] + amt || amt;
-        sys_data.colorAmounts[color] += amt;
-      }
+        color = ent["Color"].color,
+        miningFrom = ent["Mining"].miningFrom;
+    for (var j in miningFrom) {
+      var id = miningFrom[j];
+      var circle = circles[id];
+      var amt = rate * circle.amount;
+      amounts_removed[id] = amounts_removed[id] + amt || amt;
+      sys_data["colorAmounts"+color] += amt;
     }
   }
-  var i = 0;
-  while (i < circles.length) {
-    var circle = circles[i];
-    circle.amount -= amounts_removed[i];
-    if (circle.amount < 1) {
-      circles.splice(i, 1);
-      amounts_removed.splice(i, 1); // keeps i correct for amounts_removed as well
+  for (var i in amounts_removed) {
+    circles[i].amount -= amounts_removed[i];
+    if (circles[i].amount < 0.5) {
+      delete circles[i];
+      sys_data.wasCircleRemoved = true;
+      sys_data.empty = $.isEmptyObject(circles);
       continue;
     }
-    circle.radius = Math.sqrt(circle.amount);
-    i++;
+    circles[i].radius = Math.sqrt(circles[i].amount);
+  }
+}
+
+ResourcesSystem.prototype.commandMatches = function (cmd) {
+  return cmd.type == "PlaceTower" || cmd.type == "SalvageTower";
+}
+
+ResourcesSystem.prototype.run = function (cmd) {
+  var field = "colorAmounts" + cmd.color;
+  var colorAmount = this.engine.system_data[this.type][field];
+  switch (cmd.type) {
+    case "PlaceTower":
+      var diff = colorAmount - cmd.data.cost;
+      if (diff >= 0) {
+        return [{
+          changeSystemDataValue: {
+            systemType: this.type,
+            systemDataField: field,
+            systemDataFieldValue: diff
+          }
+        }];
+      } else {
+        return false;
+      }
+      break;
+    case "SalvageTower":
+      var ent = this.engine.entities[cmd.data.id];
+      if (!ent) return false;
+      var amt = Math.min(ent["Health"].hp / ent["Health"].max, 0.6) * ent["Cost"].cost;
+      return [{
+          changeSystemDataValue: {
+            systemType: this.type,
+            systemDataField: field,
+            systemDataFieldValue: colorAmount + amt
+          }
+        }];
   }
 }
 
 ResourcesSystem.prototype.render = function (frame) {
   var sys_data = frame.system_data[this.type];
-  var circles = sys_data.circles,
-      colorAmounts = sys_data.colorAmounts;
-  if (circles.length) {
+  var circles = sys_data.circles;
+  if (!sys_data.empty) {
     var graphics = this.local_data.resourceGraphics;
     graphics.clear();
     graphics.beginFill(0, 0.5);
@@ -1301,10 +1422,31 @@ ResourcesSystem.prototype.render = function (frame) {
       var circle = circles[i];
       graphics.drawCircle(circle.position.x, circle.position.y, circle.radius);
     }
+    if (this.local_data.mgDirty) {
+      var mgraphics = this.local_data.miningGraphics;
+      mgraphics.clear();
+      mgraphics.lineStyle(5, 0, 0.4);
+      for (var i in frame.entities) {
+        if (this.matches(frame.entities[i])) {
+          var ent = frame.entities[i];
+          var pos = ent["Position"].position,
+              miningFrom = ent["Mining"].miningFrom;
+          for (var j in miningFrom) {
+            var circle = circles[miningFrom[j]];
+            if (circle) {
+              mgraphics.moveTo(pos.x, pos.y);
+              mgraphics.lineTo(circle.position.x, circle.position.y);
+            }
+          }
+        }
+      }
+      this.local_data.mgDirty = false;
+    }
   }
   if (frame._time - this.local_data.lastDisplayTime > 500) {
-    if (Session.get("resourceAmount") != Math.floor(colorAmounts[this.engine.client_color])) {
-      Session.set("resourceAmount", Math.floor(colorAmounts[this.engine.client_color]));
+    var amount = Math.floor(sys_data["colorAmounts"+this.engine.client_color]);
+    if (Session.get("resourceAmount") != amount) {
+      Session.set("resourceAmount", amount);
     }
     this.local_data.lastDisplayTime = frame._time;
   }
@@ -1347,11 +1489,17 @@ TowerSelectionSystem.prototype.events = function () {
         });
         if (bestEntity) {
           that.local_data.selectedId = bestEntity._id;
+          Session.set("seltower_url", bestEntity["BitmapGraphics"].imageUrl);
           that.local_data.selectionSprite.visible = true;
         } else if (that.local_data.selectedId) {
           that.local_data.selectedId = null;
           that.local_data.selectionSprite.visible = false;
         }
+      }
+    },
+    'click [name=salvage]' : function (evt) {
+      if (that.local_data.selectedId) {
+        return new SalvageTowerCommand({id: that.local_data.selectedId}, that.engine.client_color);
       }
     }
   }
@@ -1481,10 +1629,16 @@ HealthComponent = function (max, regen, hp) {
   this.hp = hp||max;
 }
 
-MiningComponent = function (rate, radius) {
+MiningComponent = function (rate, radius, miningFrom) {
   this.type = "Mining";
   this.rate = rate;
   this.radius = radius;
+  this.miningFrom = miningFrom || [];
+}
+
+CostComponent = function (cost) {
+  this.type = "Cost";
+  this.cost = cost;
 }
 
 ColorComponent = function (color) {
@@ -1502,11 +1656,11 @@ PlaceTowerCommand = function (data, color, time) {
   this.data = data;
 }
 
-MultiplyRotationRateCommand = function (data, color, time) {
+SalvageTowerCommand = function (data, color, time) {
   this._time = time || (performance.now() - game_start_time);
   this.game_id = game_handle._id;
-  this.type = "MultiplyRotationRate";
-  this.color = "Neutral";
+  this.type = "SalvageTower";
+  this.color = color;
   this.data = data;
 }
 
@@ -1521,6 +1675,10 @@ Utils.deepCopy = function (obj) {
 
 Utils.mousePoint = function (evt) {
   return new PIXI.Point(evt.offsetX - world_offset_x, evt.offsetY - world_offset_y);
+}
+
+Utils.positionToString = function (pos) {
+  return "Posx" + pos.x.toString(16) + "y" + pos.y.toString(16);
 }
 
 Utils.deterministicConcat = function (str1, str2) {

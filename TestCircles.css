@@ -117,6 +117,7 @@ a:visited {
 
 .gameui {
   position: relative;
+  overflow: auto;
   top: 0px;
   right: 0px;
   left: 0px;
@@ -135,4 +136,22 @@ a:visited {
   height: calc(100% - 20px);
   margin-right: 10px;
   background-color: #606060;
+}
+
+.uibutton {
+  color: white;
+  font: 16px "Courier New";
+  border: none;
+  text-shadow: 2px 2px 10px white;
+  padding: 8px;
+  display: inline;
+  background-color: black;
+}
+
+.uibutton:hover {
+  background: linear-gradient(0deg, #11FFFF, #0099AA);
+}
+
+.uibutton:active {
+  background: linear-gradient(0deg, #008899, #11FFFF);
 }

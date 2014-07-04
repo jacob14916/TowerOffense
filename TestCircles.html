@@ -79,7 +79,19 @@
 <template name="gameui">
     <div class=gameui>
         <div class=uibox style="background-color:{{client_color}};width:40px"> </div>
-        <div class=uibox> Resources: {{resource_amount}}</div>
+        <div class=uibox>
+            Resources: {{resource_amount}} <br>
+            Tower cost: {{towercost}}
+        </div>
+        <div class=uibox>
+            <button class=uibutton name="prev_tower" style="height:100%;vertical-align:top"> &lt; </button>
+            <img src={{towerurl}} style='display:inline;vertical-align:middle'>
+            <button class=uibutton name="next_tower" style="height:100%;vertical-align:top"> &gt; </button>
+        </div>
+        <div class=uibox>
+            <img src={{seltowerurl}} width='64' height='64' style='display:inline;vertical-align:middle;float:left;margin-right:8px'>
+            <button class=uibutton name="salvage"> Salvage </button>
+        </div>
         <a href="HowToPlay.txt" target="blank">How to Play</a>
     </div>
 </template>
