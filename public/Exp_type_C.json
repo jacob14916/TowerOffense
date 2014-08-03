@@ -1,0 +1,20 @@
+{"frames": {
+
+"ExplosionFrame0.png":
+{
+	"frame": {"x":0,"y":0,"w":256,"h":256},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":256,"h":256},
+	"sourceSize": {"w":256,"h":256}
+}
+}, "meta": {
+	"app": "http://www.texturepacker.com",
+	"version": "1.0",
+	"image": "Exp_type_C.png",
+	"format": "RGBA8888",
+	"size": {"w":12288,"h":256},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:17e4a2d92ff3e27832c3f4938cec7c85$"
+}
+}
