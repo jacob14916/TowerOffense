@@ -1,9 +1,33 @@
 /* CSS declarations go here */
 
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  padding: 10px;
+  background-image:url('crossword.png');
+}
+
+@-webkit-keyframes rotate {
+  from {transform: rotate(0deg);}
+  to {transform: rotate(360deg);}
+}
+
+@keyframes rotate {
+  from {transform: rotate(0deg);}
+  to {transform: rotate(360deg);}
+}
+
+.infrotate {
+  -webkit-animation: rotate 2s linear infinite;
+  animation: rotate 2s linear infinite;
+}
 
 .lobby {
   position: absolute;
-  top: 0;
+  top: 60px;
   left: 0;
   bottom: 0;
   width: 300px;
@@ -96,7 +120,7 @@ a:visited {
 
 .game {
   position: absolute;
-  top: 0px;
+  top: 60px;
   right: 0px;
   bottom: 0px;
   width: calc(100% - 330px);
@@ -117,20 +141,23 @@ a:visited {
 
 .gameui {
   position: relative;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   top: 0px;
   right: 0px;
   left: 0px;
   height: 80px;
   margin-bottom: 10px;
+  /*white-space: nowrap;*/
   background-color: rgb(60,60,58);
   padding: 10px;
 }
 
 .uibox {
-  position: relative;
+/*  position: relative; */
   font: 16px "Courier New";
   color: white;
+/*  display: inline-block; */
   float: left;
   padding: 10px;
   height: calc(100% - 20px);

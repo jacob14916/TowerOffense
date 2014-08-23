@@ -4,6 +4,10 @@ Utils.deepCopy = function (obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
+Utils.offsetPoint = function (pt) {
+  return new PIXI.Point(pt.x - World.position.x, pt.y - World.position.y);
+}
+
 Utils.mousePoint = function (evt) {
   return new PIXI.Point(evt.offsetX - World.position.x, evt.offsetY - World.position.y);
 }
@@ -61,6 +65,21 @@ Utils.removeChildrenExcept = function (container, except) {
     }
     container.removeChild(container.children[index]);
   }
+}
+
+Utils.objDiffString = function (a, b) {
+  var diffs = '';
+  if (!b) return 'NOT B';
+  for (var i in a) {
+    if (Object.prototype.isPrototypeOf(a[i]) && Object.prototype.isPrototypeOf(b[i])) {
+      var subdiff = Utils.objDiffString(a[i], b[i]);
+      if (subdiff) diffs += ('[' + i + '](' + subdiff + '); ');
+    } else if (typeof b[i] != typeof a[i] || a[i] !== b[i]) {
+      diffs += 'a[' + i +'] = ' + a[i] + ', b[' +
+        i + '] = ' + b[i] + '; ';
+    }
+  }
+  return diffs;
 }
 
 Colors = {

@@ -83,15 +83,15 @@ Engine.prototype.reset = function () {
   this.game_id = null;
   this.client_color = null;
   this.currentFrameTime = 0; // time = relative game time
-  //this.currentFrameDate = null; // date = actual client Date
+  this.currentSimTime = 0;
   this.active = false;
   this.system_data.was_change_since = {};
 }
 
-Engine.prototype.tick = function (delta) {
-  this.stepFrame(delta);
+Engine.prototype.tick = function (time) {
+  this.stepFrame(this.currentFrameTime = time);
   //this.currentFrameTime += delta;
-  this.renderFrame();
+  this.render();
 }
 
 Engine.prototype.createEntity = function (components, id) {
@@ -121,7 +121,7 @@ Engine.prototype.addEntity = function (ent) {
 Engine.prototype.notifyAllSystems = function (ent) {
   for (var i in this.tickers) {
     var sys_type = this.tickers[i];
-    this.system_data.was_change_since[sys_type] = this.systems[sys_type].matches(ent);
+    if (this.systems[sys_type].matches(ent)) this.system_data.was_change_since[sys_type] = true;
   }
 }
 
@@ -167,6 +167,10 @@ Engine.prototype.makeEventHandler = function (sys_evt_handlers, type) {
   var engine = this;
   return function (evt, instance) {
     if (!engine.active) return;
+    if (evt.pageX && !evt.offsetX) {
+      evt.offsetX = evt.pageX - 300;
+      evt.offsetY = evt.pageY - 170;
+    }
     for (var e in sys_evt_handlers) {
       var cmd = sys_evt_handlers[e](evt, instance);
       if (cmd) {
@@ -176,6 +180,40 @@ Engine.prototype.makeEventHandler = function (sys_evt_handlers, type) {
     }
   }
 }
+
+//
+// Testing purposes only
+Engine.prototype.checkLoop = function () {
+  var that = this;
+  var interval = Meteor.setInterval(function () {
+    that.requestStateCheck();
+  }, 1000);
+  return function () {Meteor.clearInterval(interval);};
+}
+
+Engine.prototype.checkStateAgainst = function (state) {
+  var frame;
+  for (var i in this.framestack) {
+    if (this.framestack[i]._time == state._time) {
+      frame = this.framestack[i];
+    }
+  }
+  LogUtils.log(Utils.objDiffString(state.frame, frame));
+  LogUtils.log("Time diff", this.currentFrameTime - state.currentFrameTime)
+}
+
+Engine.prototype.requestStateCheck = function () {
+  Commands.insert({
+    _time: this.framestack[0]._time,
+    frame: this.framestack[0],
+    type: "CHECK_STATE",
+    game_id: game_handle._id,
+    color: this.client_color,
+    currentFrameTime: this.currentFrameTime
+  });
+}
+// Testing purposes only
+//
 
 Engine.prototype.insertCommand = function (cmd) {
   var i;
@@ -188,38 +226,41 @@ Engine.prototype.insertCommand = function (cmd) {
 }
 
 Engine.prototype.insertRemoteCommand = function (cmd) {
+  //
+  // Testing purposes only
+  if (cmd.type == "CHECK_STATE") {
+    this.checkStateAgainst(cmd);
+    return;
+  }
+  // Testing purposes only
+  //
   this.insertCommand(cmd);
-  var time, amtafter = this.framestack.length - 1;
+  var prev_frame_time, amtafter = this.framestack.length - 1;
   for (var i in this.framestack) {
     if (this.framestack[i]._time < cmd._time) {
       amtafter = i;
       LogUtils.log("frame #" + i, this.framestack[i]._time, cmd._time);
-      time = this.framestack[i]._time;
+      prev_frame_time = this.framestack[i]._time;
       break;
     }
   }
-  if (cmd.time > this.currentFrameTime) {
+  if (cmd._time > this.currentSimTime) {
     // the command is from the future
     return;
   }
   this.framestack.splice(0, amtafter);
   this.entities = Utils.deepCopy(this.framestack[0].entities);
   this.system_data = Utils.deepCopy(this.framestack[0].system_data);
-  var timediff = this.currentFrameTime - time;
-  this.currentFrameTime = time;
-  var amt_steps = Math.floor(timediff / MS_PER_FRAME);
-  for (var i = 0; i < amt_steps; i++) {
-    this.stepFrame(MS_PER_FRAME);
-    //this.currentFrameTime += MS_PER_FRAME;
-  }
-  this.stepFrame(timediff % MS_PER_FRAME); // catch up
-  //this.currentFrameTime = time + timediff;
+  var old_time = this.currentSimTime;
+  this.currentSimTime = prev_frame_time;
+  this.stepFrame(old_time);
 }
 
-Engine.prototype.getMatchingEntities = function (sys) {
+Engine.prototype.getMatchingEntities = function (sys, frame) {
+  frame = frame || this;
   var matching_ents = {};
-  for (var e in this.entities) {
-    var ent = this.entities[e];
+  for (var e in frame.entities) {
+    var ent = frame.entities[e];
     if (sys.matches(ent)) {
       matching_ents[e] = ent;
     }
@@ -227,14 +268,14 @@ Engine.prototype.getMatchingEntities = function (sys) {
   return matching_ents;
 }
 
-Engine.prototype.runFrame = function (delta) {
+Engine.prototype.runFrame = function (delta, frame) {
   //LogUtils.log("runframe " + delta);
   for (var i in this.tickers) {
     var sys_type = this.tickers[i];
     var sys = this.systems[sys_type];
-    var wasChange = this.system_data.was_change_since[sys_type];
-    this.system_data.was_change_since[sys_type] = false;
-    sys.tick(this.getMatchingEntities(sys), delta, wasChange);
+    var wasChange = frame.system_data.was_change_since[sys_type];
+    frame.system_data.was_change_since[sys_type] = false;
+    sys.tick(this.getMatchingEntities(sys, frame), delta, wasChange);
   }
 }
 
@@ -313,11 +354,48 @@ Engine.prototype.executeCommand = function (cmd) {
   return true;
 }
 
-Engine.prototype.stepFrame = function (delta, skipcmds) { // (delta in ms, *dump at end?) -> undefined
+Engine.prototype.stepFrame = function (target_time, extrapolate) {
+  //LogUtils.log("stepFrame " + target_time);
+  var last_sim_time = this.currentSimTime;
+  var target_sim_time = Math.floor(target_time / MS_PER_FRAME) * MS_PER_FRAME;
+  var commands = this.intervalCommands(last_sim_time, target_sim_time);
+  for (var i = last_sim_time; i < target_sim_time; i += MS_PER_FRAME) {
+    var prev_time = i,
+        next_time = i + MS_PER_FRAME,
+        step = MS_PER_FRAME;
+    for (var c in commands) {
+      var cmd = commands[c];
+      if ((prev_time <= cmd._time) && (cmd._time < next_time)) {
+        var d = cmd._time - prev_time;
+        this.runFrame(d, this);
+        this.executeCommand(cmd);
+        prev_time = cmd._time;
+        step -= d;
+      }
+    }
+    this.runFrame(step, this);
+    if (!(next_time % 1000)) this.dumpFrame(next_time);
+  }
+  if (extrapolate) {
+    this.render_frame = this.getFrame(target_sim_time);
+    this.stepFrame(target_time - target_sim_time, this.render_frame);
+    this.currentFrameTime = target_time;
+  }
+  this.currentSimTime = target_sim_time;
+}
+
+Engine.prototype.intervalCommands = function (start, end) { // [start, end)
+  return _.filter(this.commands, function (cmd) {
+    return (start <= cmd._time) && (cmd._time < end);
+  });
+}
+
+/*Engine.prototype.stepFrame = function (delta, skipcmds) { // (delta in ms, *dump at end?) -> undefined
   //LogUtils.log("stepFrame " + delta);
-  var last_time = /*(this.framestack.length)?this.framestack[0]._time:*/this.currentFrameTime;
+  var last_time = this.currentFrameTime,
+      last_sim_time = this.currentSimTime;
   var target_time = last_time + delta;
-  var failed_commands = [];
+  var target_sim_time = Math.floor(target_time / MS_PER_FRAME) * MS_PER_FRAME;
   var found_cmd = false;
   if (!skipcmds) {
     for (var i = this.commands.length - 1; i >= 0; i--) { // iterate from oldest to newest
@@ -340,16 +418,13 @@ Engine.prototype.stepFrame = function (delta, skipcmds) { // (delta in ms, *dump
     this.dumpFrame(keyframe_time);
     last_time = keyframe_time;
   }
-  /*for (var i in failed_commands) {
-    this.commands.splice(this.commands.indexOf(failed_commands[i]), 1);
-  }*/
   this.runFrame(target_time - last_time);
   this.currentFrameTime = target_time;
-}
+} */
 
 Engine.prototype.getFrame = function (time) {
   return {
-    _time: time || this.currentFrameTime,
+    _time: time,
     entities: Utils.deepCopy(this.entities),
     system_data: Utils.deepCopy(this.system_data)
   };
@@ -359,21 +434,40 @@ Engine.prototype.dumpFrame = function (time) { // (time to stamp) -> undefined
   if (this.framestack.length == FRAMESTACK_LEN) {
     this.framestack.pop();
   }
-  this.framestack.splice(0, 0, {
-    _time: time,
-    entities: Utils.deepCopy(this.entities),
-    system_data: Utils.deepCopy(this.system_data)
-  });
+  this.framestack.splice(0, 0, this.getFrame(time));
 }
 
-Engine.prototype.renderFrame = function () {
-  var frame = /*this.framestack[0];*/ {
+Engine.prototype.extrapolateValues = function(frame, delta) {
+  var delta_secs = delta/1000;
+  for (var i in frame.entities) {
+    var ent = frame.entities[i];
+    if (ent["Extrapolation"]) {
+      for (var r in ent["Extrapolation"].rates) {
+        var path = r.split("."),
+            containing = ent,
+            p = 0;
+        for (var stop = path.length - 1; p < stop; p++) {
+          containing = containing[path[p]];
+        }
+        /*if (Math.random() < 0.1) {
+          LogUtils.log("extrapolate to", containing[path[p]] + ent["Extrapolation"].rates[r] * delta_secs, "in", containing, path[p]);
+        } */
+        containing[path[p]] += ent["Extrapolation"].rates[r] * delta_secs;
+      }
+    }
+  }
+}
+
+Engine.prototype.render = function () {
+   var frame = {
     _time: this.currentFrameTime,
     entities: this.entities,
     system_data: this.system_data
   };
-  if (window.record) {
-    LogUtils.log(Utils.deepCopy(frame));
+  var timediff = this.currentFrameTime - this.currentSimTime;
+  if (timediff > 1) {
+    frame = Utils.deepCopy(frame);
+    this.extrapolateValues(frame, timediff);
   }
   for (var i in this.renderers) {
     this.systems[this.renderers[i]].render(frame);

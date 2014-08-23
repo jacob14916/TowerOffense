@@ -4,19 +4,61 @@
 </head>
 
 <body>
-  {{> lobby}}
-  {{> game}}
+ {{> topbar}}
+ {{> lobby}}
+ {{> game}}
 </body>
 
 <!-- ------------------------ -->
 
+<template name="topbar">
+    <div class=topbar align=right>
+        <img src="topbar2.png" style="float:left;"/>
+        <span>
+            {{#if currentUser}}
+            {{#if loggingOut}}
+            <img src="hourglass.gif" height="40px">
+            {{else}}
+            {{#with currentUser}}
+            <div style="display:inline-block;font-size:36px;margin-right:10px;margin-left:10px">
+            {{username}}
+            </div>
+            <div style="display:inline-block">
+                {{#with profile}}
+                wins: {{wins}} <br>
+                losses: {{losses}}
+                {{/with}}
+            </div>
+            {{/with}}
+            <input type=button value="Logout" style="vertical-align:top">
+            {{/if}}
+            {{else}}
+            {{#if loggingIn}}
+            <img src="hourglass.gif" height="40px">
+            {{else}}
+            {{> loginbuttons}} <!-- not to be confused with loginButtons -->
+            {{/if}}
+            {{/if}}
+        </span>
+    </div>
+</template>
+
+<template name="loginbuttons">
+    <span>
+        User name <input type=text name="username">
+        Password <input type=password name="password">
+        <input type=button value="Login">
+    </span>
+</template>
+
 <template name="lobby">
   <div class="lobby">
+ <!--
     Enter thy name:
       <input type="text" value="{{getname}}" class="nameinput" maxlength="25"/>
       <br/>
       Greetings, <b>{{getname}}</b>.
-      <br/> <br/> <br/>
+      <br/> <br/> <br/> -->
     {{numconnected}}
     <div class="playerlist">
       {{#each playerlist}}
@@ -88,9 +130,6 @@
             {{#each towertypes}}
             {{> towerimg this}}
             {{/each}}
-            <!-- <button class=uibutton name="prev_tower" style="height:100%;vertical-align:top"> &lt; </button>
-            <img src={{towerurl}} width='64' height='64' style='display:inline;vertical-align:middle'>
-            <button class=uibutton name="next_tower" style="height:100%;vertical-align:top"> &gt; </button> !-->
         </div>
         <div class=uibox>
             <img src={{seltowerurl}} width='64' height='64' style='display:inline;vertical-align:middle;float:left;margin-right:8px'>

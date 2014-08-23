@@ -40,6 +40,7 @@ AttackComponent = function (damage, radius, regen, speed, barrelLength, bulletIm
   this.bulletImage = bulletImage;
   this.charge = charge || 0;
   this.target = target || null;
+  this.num_fired = 0;
 }
 
 BulletComponent = function (target, damage, vx, vy, dx, dy, sx, sy) {
@@ -82,6 +83,11 @@ SightComponent = function (radius) {
 ColorComponent = function (color) {
   this.type = "Color";
   this.color = color;
+}
+
+ExtrapolationComponent = function (rates) {
+  this.type = "Extrapolation";
+  this.rates = rates;
 }
 
 //--------

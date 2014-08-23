@@ -33,7 +33,7 @@ TowerSelectionSystem.prototype.events = function () {
   var that = this;
   return {
     'click .gamecontent' : function (evt) {
-      if (evt.button == 0) {
+      if (evt.button == 0 && !evt.shiftKey) {
         var bestEntity = E.findEntity(function (ent) {
           return (ent["Footprint"] && ent["Position"] && ent["Color"] &&
                  Geometry.distanceSquared(ent["Position"].position, Utils.mousePoint(evt)) <= Math.pow(ent["Footprint"].radius, 2));

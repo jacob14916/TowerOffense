@@ -28,7 +28,7 @@ AttackSystem.scoreTarget = function (ent_pos, tgt) { // lower is better
     score -= lnk.linkedEntities.length * 10;
   }
   if (tgt["Attack"]) {
-    score -= tgt["Attack"].damage;
+    score -= 2 * tgt["Attack"].damage * tgt["Attack"].regen;
     score -= tgt["Attack"].charge * 10;
   }
   score -= tgt["Health"].max / 10;
@@ -41,13 +41,13 @@ AttackSystem.prototype.matches = function (ent) {
 
 AttackSystem.prototype.tick = function (ents, delta, wasChange) { // smarter algorithm later
   var delta_secs = delta / 1000;
-  this.local_data.dirty = wasChange;
+  this.local_data.dirty = wasChange||this.local_data.dirty;
   for (var i in ents) {
     var ent = ents[i];
     if (!(ent["Linkage"].isLinked || ent["Linkage"].isRoot)) continue;
     var attack = ent["Attack"];
     if (attack.charge < 1) {
-      attack.charge += attack.regen * delta_secs;
+      attack.charge += attack.regen[attack.num_fired % attack.regen.length] * delta_secs;
     }
     if (attack.charge >= 1) {
       var ent_color = ent["Color"].color, ent_pos = ent["Position"].position, r2 = Math.pow(attack.radius, 2);
@@ -58,19 +58,22 @@ AttackSystem.prototype.tick = function (ents, delta, wasChange) { // smarter alg
       }, AttackSystem.scoreTarget.bind(null, ent_pos));
       if (target) {
         attack.charge -= 1;
+        attack.num_fired++;
+        var time_missed = attack.charge / attack.regen[attack.num_fired % attack.regen.length];
         var rot = Geometry.rotationFromUp(ent_pos, target["Position"].position);
         ent["Position"].rotation = rot;
         var cos_rot = Math.sin(rot), sin_rot = -Math.cos(rot); // all screwed up because of PIXI coords
-        var x = ent_pos.x + attack.barrelLength * cos_rot,
-            y = ent_pos.y + attack.barrelLength * sin_rot;
+        var x = ent_pos.x + attack.barrelLength * cos_rot, vx = attack.speed * cos_rot,
+            y = ent_pos.y + attack.barrelLength * sin_rot, vy = attack.speed * sin_rot;
         var distance = Geometry.distance({x: x, y: y}, target["Position"].position) - target["Footprint"].radius;
         this.engine.createEntity([ // fire!
-          new PositionComponent(new PIXI.Point(x, y), rot),
-          new BulletComponent(target._id, attack.damage, attack.speed * cos_rot, attack.speed * sin_rot,
+          new PositionComponent(new PIXI.Point(x + vx * time_missed, y + vy * time_missed), rot),
+          new BulletComponent(target._id, attack.damage, vx, vy,
                               Math.abs(distance * cos_rot), Math.abs(distance * sin_rot), x, y),
           new BitmapGraphicsComponent(attack.bulletImage + ent_color + ".png", true),
-          new ColorComponent(ent_color)
-        ]);
+          new ColorComponent(ent_color),
+          new ExtrapolationComponent({'Position.position.x': vx, 'Position.position.y': vy})
+        ], ent._id + attack.num_fired);
       } else {
         attack.charge = 1;
       }

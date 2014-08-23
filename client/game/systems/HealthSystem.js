@@ -123,13 +123,14 @@ HealthSystem.prototype.render = function (frame) {
     if (!health) {
       continue;
     }
-    if (health.hp != health.max) {
+    var ratio =  (health.hp / health.max);
+    if (ratio < 1) {
       var x = ent["Position"].position.x - HB_WIDTH/2, y = ent["Position"].position.y + HB_OFFSET;
-      bargfx.lineColor = HB_COLOR;
+      bargfx.lineColor =  Math.floor((1-ratio) * 0xff) * 0x10000 + 0xFF00;
       bargfx.moveTo(x, y);
-      bargfx.lineTo(x + (health.hp / health.max) * HB_WIDTH, y);
+      bargfx.lineTo(x + ratio * HB_WIDTH, y);
       bargfx.lineColor = HB_DAMAGECOLOR;
-      bargfx.moveTo(x + (health.hp / health.max) * HB_WIDTH, y);
+      bargfx.moveTo(x + ratio * HB_WIDTH, y);
       bargfx.lineTo(x + HB_WIDTH, y);
     }
   }

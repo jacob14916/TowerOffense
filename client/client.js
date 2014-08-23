@@ -1,6 +1,6 @@
 // Constants
 
-MS_PER_FRAME = 30;
+MS_PER_FRAME = 50;
 GUESS_LATENCY = 100; // guess 100 ms for other client to respond
 
 START_DATA = {
@@ -29,6 +29,33 @@ WORLD_HEIGHT = 4000;
 
 LINK_WIDTH = 5;
 LINK_ALPHA = 0.4;
+
+START_RESOURCES = 500;
+
+// Top bar templates
+
+Template.loginbuttons.events({
+  'click [value=Login]': function (evt, instance) {
+    Meteor.loginWithPassword(instance.find('[name=username]').value, instance.find('[name=password]').value, function (e) {
+      if (e) {LogUtils.log(e); return;}
+    });
+  }
+})
+
+Template.topbar.events({
+  'click [value=Logout]': function (evt) {
+    Meteor.logout(function (e) {
+      if (e) {LogUtils.log(e); return;}
+      Session.set('loggingOut', false);
+      Meteor.disconnect();
+    });
+    Session.set('loggingOut', true);
+  }
+});
+
+Template.topbar.loggingOut = function () {
+  return Session.get('loggingOut');
+}
 
 // Lobby templates
 
@@ -119,7 +146,7 @@ Template.challenge.events({
 Template.mychallenge.getmychallenge = function () {
   var game = Games.findOne({player_1: Session.get("player_id")});
   if (!game) return "no one";
-  return Players.findOne({_id: game.player_2}).name;
+  return (Players.findOne({_id: game.player_2})||{}).name;
 }
 
 var oldStatus, oldMessage;
@@ -222,18 +249,43 @@ start_game = function (id, color) {
   E.startup(color, id);
   var observe_handle = Commands.find({game_id: id, color: other_color}).observe({
     added: function (cmd) {
+      //Meteor.setTimeout(function() {
       LogUtils.log("Received command from enemy", cmd);
       E.insertRemoteCommand(cmd);
       Commands.remove({_id: cmd._id});
+      //}, 2000);
     }
   });
   var last_time = performance.now();
   var anim_handler = function (timestamp) {
-    E.tick(timestamp - last_time);
-    last_time = timestamp;
+    E.tick(timestamp - game_start_time);
+    //last_time = timestamp;
+    //E.currentFrameTime = timestamp;
+    //E.render();
     game_handle.loopHandle = requestAnimationFrame(anim_handler);
   }
+
   game_handle.loopHandle = requestAnimationFrame(anim_handler);
+  game_handle.endHandle = Meteor.setInterval(function () {
+    var profile = Meteor.user().profile;
+    if (!E.entities.StartTower1) {
+      if (E.client_color == "Red") {
+        profile.losses++;
+      } else {
+        profile.wins++;
+      }
+      Meteor.users.update({_id: Meteor.user()._id}, {$set: {profile: profile}});
+      end_game();
+    } else if (!E.entities.StartTower2) {
+      if (E.client_color == "Blue") {
+        profile.losses++;
+      } else {
+        profile.wins++;
+      }
+      Meteor.users.update({_id: Meteor.user()._id}, {$set: {profile: profile}});
+      end_game();
+    }
+  }, 1000);
   game_handle.observeHandle = observe_handle;
   game_handle._id = id;
 
@@ -247,6 +299,7 @@ start_game = function (id, color) {
 
 end_game = function () {
   cancelAnimationFrame(game_handle.loopHandle);
+  Meteor.clearInterval(game_handle.endHandle);
   Meteor.setTimeout(function () {
     game_handle.observeHandle.stop();
     game_handle.playing = false;
@@ -254,7 +307,7 @@ end_game = function () {
     Games.remove({_id: game_handle._id});
     Utils.removeChildrenExcept(World);
     Renderer.render(Stage);
-  }, 200);
+  }, 1000);
 }
 
 //------------------------
@@ -434,17 +487,24 @@ Template.game.events(E.gatherEvents()); //Yes!
 
 Meteor.startup(
   function () {
-    LogUtils.log("Starting new gane @", Date());
+    LogUtils.log("Starting new game @", Date());
     Meteor.subscribe("players");
     Meteor.subscribe("games");
     Meteor.subscribe("commands");
     Meteor.subscribe("chat");
-
-    var player_id = Players.insert({name: 'anonymous', status: 0});
-    Session.set("player_id", player_id);
-    Session.set("client_color", 0);
-    Meteor.call('register_player_connection', player_id);
-    Session.set("name", "anonymous");
+    //Meteor.subscribe("users");
+    var previous_userid = "";
+    Deps.autorun(function () {
+      var user = Meteor.user();
+      if (!user || previous_userid == user._id) return;
+      previous_userid = user._id;
+      Meteor.reconnect();
+      var player_id = Players.insert({name: user.username, status: 0});
+      Session.set("player_id", player_id);
+      Session.set("client_color", 0);
+      Meteor.call('register_player_connection', player_id);
+      Session.set("name", user.username);
+    });
 
     Games.find().observe({
       removed: function (doc) {

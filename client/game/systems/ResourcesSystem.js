@@ -6,7 +6,7 @@ ResourcesSystem = function (engine) {
 ResourcesSystem.prototype.startup = function () {
   var data = {wasCircleRemoved: false, circles: {}};
   Colors.forEachColor(function (color) {
-    data["colorAmounts"+color] = 300;
+    data["colorAmounts"+color] = START_RESOURCES;
   });
   var resourceLayer = new PIXI.DisplayObjectContainer(),
       circleBatch = new PIXI.SpriteBatch(),
@@ -20,7 +20,7 @@ ResourcesSystem.prototype.startup = function () {
       position: new PIXI.Point(x, y),
       amount: amt,
       radius: Math.sqrt(amt),
-      _id: Meteor.uuid()
+      _id: Utils.positionToString(new PIXI.Point(x, y))
     };
   };
   var addCircle = function (x, y, amt) {
@@ -34,7 +34,7 @@ ResourcesSystem.prototype.startup = function () {
   }
   for (var i = 0; i < 9; i++) {
     for (var j = 0; j < 9; j++) {
-      addCircle((i - 4) * 300, (j - 4) * 200, 400);
+      addCircle((i - 4) * 300, (j - 4) * 200, 0x100);
     };
   }
   this.engine.system_data[this.type] = data;
@@ -99,7 +99,6 @@ ResourcesSystem.prototype.tick = function (ents, delta, wasChange) {
           sys_data["colorAmounts"+color] = Math.round(sys_data["colorAmounts"+color]);
         }
       });
-      LogUtils.log(amounts_removedbc, circles[i].amount);
       delete circles[i];
       sys_data.wasCircleRemoved = true;
       sys_data.empty = $.isEmptyObject(circles);

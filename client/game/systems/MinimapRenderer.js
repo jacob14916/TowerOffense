@@ -11,14 +11,14 @@ MinimapRenderer.prototype.startup = function () {
   }
   var minimapLayer = new PIXI.DisplayObjectContainer();
   Stage.addChild(minimapLayer); // goes on top of World
-  var minimapGraphics = new PIXI.Graphics();
-  minimapLayer.addChild(minimapGraphics);
-  var minimapFrame = new PIXI.Graphics(),
+  var minimapGraphics = new PIXI.Graphics(),
+      minimapFrame = new PIXI.Graphics(),
       cameraView = new PIXI.Graphics();
   minimapLayer.addChild(minimapFrame);
+  minimapLayer.addChild(minimapGraphics);
   minimapLayer.addChild(cameraView);
   minimapFrame.lineStyle(4, 0, 0.8);
-  minimapFrame.beginFill(0xffffff, 0.5);
+  minimapFrame.beginFill(0xffffff, 0.8);
   var width = WORLD_WIDTH / 20;
   var height = WORLD_HEIGHT / 20;
   minimapFrame.drawRect(0,0,width,height);
@@ -112,7 +112,7 @@ MinimapRenderer.prototype.render = function (frame) {
       var ent = frame.entities[ents_to_draw[i]];
       if (this.matches(ent)) {
         var halfsize = Math.floor(ent["Footprint"].radius/8);
-        mmGraphics.beginFill(Colors.screenColors[ent["Color"].color],0.8);
+        mmGraphics.beginFill(Colors.screenColors[ent["Color"].color]);
         mmGraphics.drawRect((ent["Position"].position.x + WORLD_HEIGHT/2)/20 - halfsize, (ent["Position"].position.y + WORLD_HEIGHT/2)/20 - halfsize,
                                                 2 * halfsize, 2 * halfsize);
         mmGraphics.endFill(0, 0.5);
