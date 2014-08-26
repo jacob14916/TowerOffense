@@ -19,8 +19,7 @@ TOWER_DATA = {
     health: 40,
     healthRegen: 1,
     mining: true,
-    cRate: 5,
-    vRate: 0.005,
+    cRate: 2,
     miningRadius: 250,
     nonattacking: true
   },
@@ -28,7 +27,7 @@ TOWER_DATA = {
     type: "HeavyTurret",
     cost: 250,
     health: 200,
-    healthRegen: 1,
+    healthRegen: 2,
     attackRadius: 300,
     attackRegen: [0.45, 0.55],
     attackDamage: 40,
@@ -42,7 +41,7 @@ TOWER_DATA = {
     healthRegen: 3,
     attackRadius: 275,
     attackRegen: [3.5, 4.5],
-    attackDamage: 7,
+    attackDamage: 5,
     bulletSpeed: 400,
     footRadius: 24
   },
@@ -53,17 +52,17 @@ TOWER_DATA = {
     healthRegen: 1,
     attackRadius: 350,
     attackRegen: [1],
-    attackDamage: 14,
+    attackDamage: 16,
     bulletSpeed: 500
   },
   Turret: {
     type: "Turret",
     cost: 50,
     health: 125,
-    healthRegen: 2,
+    healthRegen: 1,
     attackRadius: 275,
     attackRegen: [1],
-    attackDamage: 12,
+    attackDamage: 10,
     bulletSpeed: 400
   },
   RocketTurret: {
@@ -73,7 +72,7 @@ TOWER_DATA = {
     health: 275,
     healthRegen: 2,
     attackRadius: 325,
-    attackRegen: [0.2],
+    attackRegen: [0.25],
     attackDamage: 100,
     bulletSpeed: 200,
     barrelLength: 8
@@ -148,7 +147,11 @@ PlaceTowerSystem.prototype.events = function () {
     },
     'keydown' : function(evt) {
       var i;
-      if (evt.which == 77) { // m
+      if (evt.which == 90) { // z
+        i = (that.local_data.towerIndex + NUM_TOWERS - 1) % NUM_TOWERS;
+      } else if (evt.which == 67) { // c
+        i = (that.local_data.towerIndex + 1) % NUM_TOWERS;
+      } else if (evt.which == 77) { // m
         i = 1;
       } else if (evt.which == 80) { // p
         i = 0;
@@ -229,8 +232,12 @@ PlaceTowerSystem.prototype.render = function (frame) {
   if (sprite.visible) {
     var pos = Stage.getMousePosition();
     sprite.position = pos;
+    var offset_pos = Utils.offsetPoint(pos);
     var fradius = TOWER_DATA[TOWER_TYPES[this.local_data.towerIndex]].footRadius || this.local_data.footRadius;
-    if (this.checkFootprint(_.filter(frame.entities, this.matches), Utils.offsetPoint(pos), fradius)) {
+    if (this.checkFootprint(_.filter(frame.entities, this.matches), offset_pos, fradius) && _.find(frame.entities, function (ent) {
+      return ent["Linkage"] && ent["Linkage"].active && (ent["Linkage"].isLinked || ent["Linkage"].isRoot) &&
+        Geometry.distanceSquared(ent["Position"].position, offset_pos) <= Math.pow(ent["Linkage"].radius, 2);  // evil? (oh well)
+    })) {
       sprite.tint = 0x00ff00;
     } else {
       sprite.tint = 0xff0000;

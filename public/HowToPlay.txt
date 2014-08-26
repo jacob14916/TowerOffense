@@ -13,22 +13,187 @@ ___________
 
 Game Overview
 
-You are in control of an advanced technology known as TOWERS, or TOWERS Operated
-Without ExteRnal directiveS for short. These stationary though versatile robots
-are equipped with a variety of the latest weaponry and resource-harvesting
-gadgets, though they must connect to the Base (Root) tower to operate. Your
-mission is to eliminate your opponent's towers from the battlefield. True to the
-acronym, the towers aim and attack on their own, allowing you to focus on higher
-strategy.
+You are in control of an advanced technology known as TOWERS, or TOWERS Operated Without ExteRnal directiveS for short.
+These stationary though versatile robots are equipped with a variety of the latest weaponry and resource-harvesting gadgets, though they must connect to the HQ (Root) tower to operate.
+Your mission is to eliminate your opponent's HQ from the battlefield.
+True to the acronym, the towers aim and attack on their own, allowing you to focus on higher strategy.
 
-How To Play
+Setting Up
 
-Use the widget at the top to choose which tower to place next. Click on the map
-while holding down shift to place a tower.
+1. Log In: Enter your username and password in the top right, then click "Log In." You will not be visible in the lobby until you do so.
+2.a. Challenge your Opponent: Click the button with their username on it to challenge them.
+  b. Accept a Challenge: If you have been challenged, a widget will appear in the lobby asking you to accept their challenge.
+3. Your game will begin shortly.
 
-Tower types (in order of appearance in the top widget, left to right):
-- PYLON: These link towers to the Base. If towers are not linked, they will not
-function. They are cheap and have some health. You can see their link range by
-the light colored circle surrounding them.
-- MINER: These towers mine resources from the gray pools throughout the map.
-Resources are necessary to build towers.
+Gameplay
+
+1. The Game UI is the area above the game view but below the top bar. From left to right:
+  a. The Color Patch shows which color you are playing as.
+  b. The Info Panel shows your current resources and the name and cost of the tower you have selected to build.
+  c. The Tower List shows the different towers you can build and which one you have selected to build (by an orange border). Click to change the build tower type.
+  d. The Selection Panel shows the image of the tower you have selected (if any) and the option to salvage it.
+ Note that on a small screen you may have to scroll down.
+
+2. The minimap is located in the top left of the game view.
+  a. The green rectangle represents the scope of your view of the game. Drag it with the mouse to move your view around the map.
+  b. The colored dots represent towers of those colors. Only enemies and unlinked towers visible (see 8) to your linked towers are visible on the minimap.
+  c. If the minimap turns yellow, you are under attack. The small black rectangle(s) on the map show the location(s) of attack.
+
+3. The keyboard shortcuts are as follows:
+  W/A/S/D or Arrow Keys: Move around the map.
+  1-8: Select the nth tower type to build (from left to right).
+  Z/C: Cycle (Z: left, C: right) through the tower types to build.
+  X: Salvage the selected tower.
+  Q: Center the view on your HQ.
+  M: Select the Miner to build.
+  P: Select the Pylon to build.
+  Shift: Activate build/place. A green "preview" will appear under your mouse if the placement is legal, a red preview if illegal.
+
+4. With the mouse:
+  a. Click on one of your towers to select it, as will be indicated by a "swinging" green circle around it. With a tower selected:
+    i. Click another friendly tower to select it.
+    ii. Click an enemy tower to have your tower target it.
+    iii. Click the same tower again or on empty space to deselect.
+  b. Click with the shift key down (see also 3-Shift) to build a tower of the type selected in the Game UI (see 1) at the location of the click.
+
+5. Footprint:
+  a. Towers cannot be placed on top of each other. Each tower has a "footprint" circle which no other tower's may overlap.
+
+6. Resources:
+  a. Are present on the map in dark gray circular pools. On the current map the pools contain 576 resources each. In addition, each player begins with 500 resources.
+  b. Can be mined by building Miner towers near pools. Gray lines will be drawn from Miners to the pools they are mining from, which will shrink as they are depleted.
+  c. Allow you to build towers. If a build is completed, the tower's cost will be deducted from your resource amount.
+  d. Can be reclaimed up to 60% from built towers by salvaging them. However, more damaged towers yield fewer resources.
+
+7. Terrain:
+  a. Lakes are blue circles or combinations of circles.
+  b. Towers cannot be placed on lakes.
+  c. A known bug is that the tower build preview indicator (see 3-Shift) is sometimes green even though the tower would be built over a lake.
+
+8. Fog of War:
+  a. You can only see things (terrain features, enemies, resource pools, etc.) within a certain range of at least one of your towers.
+  b. Unlinked (see 9) towers cannot see.
+
+9. Linkage:
+  a. All towers must be linked back through Pylons to your HQ. Otherwise, they will not function (i.e. see, regenerate health, mine, attack).
+  b. Towers can only be built within linkage range.
+  c. Your Pylons' and HQ's linkage range is represented by the solid, lightly colored circles around them. If these are hard to see, tilt your screen.
+
+10. Attacking and Health:
+  a. Attacking towers automatically shoot enemies that are in range. However, you can manually target them (see 4-a-ii).
+  b. Attack charge may regenerate at different rates for the same tower. For example, the Pulse Turret fires three bullets in a row, then takes longer to charge up again.
+  b. Towers that are linked regerate health over time, some types faster than others.
+  c. Health is represented by fraction of green on the rectangular bars above the towers. If the bar is not visible, that tower has full health.
+  c. If a tower's health reaches 0, it blows up.
+
+11. Tower stats, as copied from the source code. Numbers are in pixels, rates are per second.
+
+TOWER_DATA = {
+  HQ: {
+    footRadius: 48,
+    cost: 0
+    type: "HQ",
+    isRoot: true,
+    linkRadius: 250,
+    activeLink: true,
+    nonattacking: true,
+    health: 800,
+    healthRegen: 10
+  },
+  Pylon: {
+    type: "Pylon",
+    cost: 50,
+    activeLink: true,
+    linkRadius: 200,
+    health: 100,
+    healthRegen: 4,
+    footRadius: 21,
+    nonattacking: true
+  },
+  Miner: {
+    type: "Miner",
+    cost: 25,
+    health: 40,
+    healthRegen: 1,
+    mining: true,
+    cRate: 2,
+    miningRadius: 250,
+    nonattacking: true
+  },
+  HeavyTurret: {
+    type: "HeavyTurret",
+    cost: 250,
+    health: 200,
+    healthRegen: 2,
+    attackRadius: 300,
+    attackRegen: [0.45, 0.55],
+    attackDamage: 40,
+    bulletSpeed: 250,
+    footRadius: 28
+  },
+  MachineGun: {
+    type: "MachineGun",
+    cost: 150,
+    health: 200,
+    healthRegen: 3,
+    attackRadius: 275,
+    attackRegen: [3.5, 4.5],
+    attackDamage: 5,
+    bulletSpeed: 400,
+    footRadius: 24
+  },
+  Sniper: {
+    type: "Sniper",
+    cost: 300,
+    health: 100,
+    healthRegen: 1,
+    attackRadius: 350,
+    attackRegen: [1],
+    attackDamage: 16,
+    bulletSpeed: 500
+  },
+  Turret: {
+    type: "Turret",
+    cost: 50,
+    health: 125,
+    healthRegen: 1,
+    attackRadius: 275,
+    attackRegen: [1],
+    attackDamage: 10,
+    bulletSpeed: 400
+  },
+  RocketTurret: {
+    type: "RocketTurret",
+    cost: 400,
+    footRadius: 48,
+    health: 275,
+    healthRegen: 2,
+    attackRadius: 325,
+    attackRegen: [0.25],
+    attackDamage: 100,
+    bulletSpeed: 200,
+    barrelLength: 8
+  },
+  PulseTurret: {
+    type: "PulseTurret",
+    cost: 200,
+    health: 125,
+    healthRegen: 2,
+    attackRadius: 300,
+    attackRegen: [0.6, 4, 4],
+    attackDamage: 16,
+    bulletSpeed: 300,
+    barrelLength: 6,
+    footRadius: 25
+  }
+};
+
+ The default footRadius is 26 px.
+
+12. Ending the game:
+  a. You win by destroying the enemy's HQ, or lose by having yours destroyed. The game should end shortly and the view should turn all gray.
+  b. To surrender, salvage your own HQ.
+  c. Your win-loss record will be updated after every game, unless there is a glitch or you or your opponent closes the game in their browser.
+__________________
+
+Developed by Jacob

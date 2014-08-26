@@ -1,6 +1,7 @@
 BitmapGraphicsRenderer = function (engine) {
   this.type = "BitmapGraphics";
   this.engine = engine;
+  this.startup_index = 6;
 }
 
 BitmapGraphicsRenderer.prototype.startup = function () {

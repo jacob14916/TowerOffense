@@ -1,37 +1,3 @@
-// Constants
-
-MS_PER_FRAME = 50;
-GUESS_LATENCY = 100; // guess 100 ms for other client to respond
-
-START_DATA = {
-  1: {
-    position: new PIXI.Point(0,-1000),
-    id: "StartTower1"
-  },
-  2: {
-    position: new PIXI.Point(0,1000),
-    id: "StartTower2"
-  }
-}
-
-FRAMESTACK_LEN = 200;
-
-HB_COLOR = 0x20E020;
-HB_DAMAGECOLOR = 0xFF0000;
-HB_WIDTH = 48;
-HB_OFFSET = 24;
-HB_THICKNESS = 3;
-
-WORLD_TOP_LEFT = new PIXI.Point(-2000, -2000);
-WORLD_BOTTOM_RIGHT = new PIXI.Point(2000, 2000);
-WORLD_WIDTH = 4000;
-WORLD_HEIGHT = 4000;
-
-LINK_WIDTH = 5;
-LINK_ALPHA = 0.4;
-
-START_RESOURCES = 500;
-
 // Top bar templates
 
 Template.loginbuttons.events({
@@ -161,13 +127,13 @@ Template.mychallenge.status = function () {
     }
     return "<i>Click one of the players in the lobby to challenge them</i>";
   } else if (game.status == oldStatus) return oldMessage;
-  else if (game.status == "challenge") message = "Pending";
-  else if (game.status == "declined") message = "Declined";
-  else if (game.status == "playing") {
-    LogUtils.log(this.oldStatus);
-    start_game(game._id, Colors[1]);
-    message = "Accepted - playing!"
-  }
+    else if (game.status == "challenge") message = "Pending";
+      else if (game.status == "declined") message = "Declined";
+        else if (game.status == "playing") {
+          LogUtils.log(this.oldStatus);
+          start_game(game._id, Colors[1]);
+          message = "Accepted - playing!"
+        }
   oldStatus = game.status;
   oldMessage = message;
   return message;
@@ -249,19 +215,14 @@ start_game = function (id, color) {
   E.startup(color, id);
   var observe_handle = Commands.find({game_id: id, color: other_color}).observe({
     added: function (cmd) {
-      //Meteor.setTimeout(function() {
       LogUtils.log("Received command from enemy", cmd);
       E.insertRemoteCommand(cmd);
       Commands.remove({_id: cmd._id});
-      //}, 2000);
     }
   });
   var last_time = performance.now();
   var anim_handler = function (timestamp) {
     E.tick(timestamp - game_start_time);
-    //last_time = timestamp;
-    //E.currentFrameTime = timestamp;
-    //E.render();
     game_handle.loopHandle = requestAnimationFrame(anim_handler);
   }
 
@@ -322,25 +283,28 @@ Template.game.rendered = function () {
   Renderer = PIXI.autoDetectRenderer(w, h, undefined, false, true);
 
   containerdiv.appendChild(Renderer.view);
-  //Stage.addChild(new PIXI.TilingSprite(PIXI.Texture.fromImage("SeamlessRockFace.jpg"), 1920, 1080)); find/make background later
   Renderer.render(Stage);
   var minX = w - WORLD_BOTTOM_RIGHT.x, minY = h - WORLD_BOTTOM_RIGHT.y;
   window.addEventListener("keydown", function (evt) {
     var x = World.position.x, y = World.position.y;
     switch (evt.which) {
       case 37: // left
+      case 65: // a
         x = Math.min(-WORLD_TOP_LEFT.x, x + 20);
         break;
-      case 38: // down
+      case 38: // up
+      case 87: // w
         y = Math.min(-WORLD_TOP_LEFT.y, y + 20);
         break;
       case 39: // right
+      case 68: // d
         x = Math.max(minX, x - 20);
         break;
-      case 40: // up
+      case 40: // down
+      case 83: // s
         y = Math.max(minY, y - 20);
         break;
-      case 67: // c
+      case 81: // q
         var pos = START_DATA[Colors.number(E.client_color)].position;
         x = Math.floor(Renderer.width/2 - pos.x);
         y = Math.floor(Renderer.height/2 - pos.y);
@@ -400,14 +364,6 @@ Template.towerimg.selectedborder = function () {
   return (Session.get("tower_type") == this.type)?"orange":"gray";
 }
 
-//------------------------
-// Game logic
-
-// Note to self:
-// Resume work at "//$" sign
-
-
-
 /*
 
 A System defines the following:
@@ -435,49 +391,6 @@ A Component defines the following:
 
 */
 
-//--------
-
-
-
-//--------
-
-
-
-//--------
-
-
-
-//BulletSystem.prototype.render = function (frame) {} // make custom bullet renderer later
-
-//--------
-
-
-
-//--------
-
-
-
-//--------
-
-
-
-//--------
-
-
-
-//--------
-
-
-
-//--------
-
-
-
-//------------------------
-// Game utils
-
-
-//------------------------
 
 E = new Engine();
 E.addSystems(new TerrainSystem(E), new TowerLinkageSystem(E), new ResourcesSystem(E), new PlaceTowerSystem(E), new AttackSystem(E),
@@ -492,7 +405,7 @@ Meteor.startup(
     Meteor.subscribe("games");
     Meteor.subscribe("commands");
     Meteor.subscribe("chat");
-    //Meteor.subscribe("users");
+    document.title = "Tower Offense";
     var previous_userid = "";
     Deps.autorun(function () {
       var user = Meteor.user();
@@ -515,7 +428,5 @@ Meteor.startup(
         }
       }
     });
-    //E.tick();
-    //Meteor.setInterval(function(){E.tick()}, 1000);
   }
 )

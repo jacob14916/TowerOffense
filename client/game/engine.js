@@ -7,7 +7,7 @@
 */
 
 Engine = function () {
-/**
+  /**
 * Object containing systems by type
 *
 * @property systems
@@ -15,7 +15,7 @@ Engine = function () {
 * @default {}
 */
   this.systems = {};
-/**
+  /**
 * Array of systems with "render" function
 *
 * @property renderers
@@ -23,7 +23,7 @@ Engine = function () {
 * @default []
 */
   this.renderers = [];
-/**
+  /**
 * Array of systems with "run" function
 *
 * @property command_handlers
@@ -31,7 +31,7 @@ Engine = function () {
 * @default []
 */
   this.command_handlers = [];
-/**
+  /**
 * Array of systems with "tick" function
 *
 * @property tickers
@@ -39,7 +39,7 @@ Engine = function () {
 * @default []
 */
   this.tickers = [];
-/**
+  /**
 * Array of systems in order of addition
 *
 * @property startup_order
@@ -54,6 +54,7 @@ Engine.prototype.startup = function (color, id) {
   this.client_color = color;
   this.game_id = id;
   this.active = true;
+  var that = this;
   var cmdlist = [];
   for (var i in this.startup_order) {
     var sys_cmds = this.systems[this.startup_order[i]].startup();
@@ -69,7 +70,7 @@ Engine.prototype.startup = function (color, id) {
 }
 
 Engine.prototype.reset = function () {
-/**
+  /**
 * Array of recent frames, length capped by FRAMESTACK_LEN. Index 0 is most recent
 *
 * @property framestack
@@ -85,7 +86,7 @@ Engine.prototype.reset = function () {
   this.currentFrameTime = 0; // time = relative game time
   this.currentSimTime = 0;
   this.active = false;
-  this.system_data.was_change_since = {};
+  this.system_data.was_change_since = {}; // use system_data so correct historically
 }
 
 Engine.prototype.tick = function (time) {
@@ -126,13 +127,22 @@ Engine.prototype.notifyAllSystems = function (ent) {
 }
 
 Engine.prototype.addSystems = function () {
-  for (var i in arguments) {
+  for (var i in arguments) { // order of arguments determines order of execution
     var sys = arguments[i];
     this.systems[sys.type] = sys;
     if (sys.render) this.renderers.push(sys.type);
     if (sys.run) this.command_handlers.push(sys.type);
     if (sys.tick) this.tickers.push(sys.type);
-    if (sys.startup) this.startup_order.push(sys.type);
+    if (sys.startup) { // to determine render layer order
+      var index = this.startup_order.length;
+      for (var s in this.startup_order) {
+        if (!sys.startup_index || this.systems[this.startup_order[s]].startup_index > sys.startup_index) {
+          index = s;
+          break;
+        }
+      }
+      this.startup_order.splice(index, 0, sys.type);
+    }
   }
 }
 
@@ -167,8 +177,8 @@ Engine.prototype.makeEventHandler = function (sys_evt_handlers, type) {
   var engine = this;
   return function (evt, instance) {
     if (!engine.active) return;
-    if (evt.pageX && !evt.offsetX) {
-      evt.offsetX = evt.pageX - 300;
+    if (evt.pageX && !evt.offsetX) { // Firefox workaround
+      evt.offsetX = evt.pageX - 300; // Inexact, but makes it usable
       evt.offsetY = evt.pageY - 170;
     }
     for (var e in sys_evt_handlers) {
@@ -216,7 +226,7 @@ Engine.prototype.requestStateCheck = function () {
 //
 
 Engine.prototype.insertCommand = function (cmd) {
-  var i;
+  var i = 0;
   for (i in this.commands) {
     if (this.commands[i]._time < cmd._time) {
       break;
@@ -235,20 +245,20 @@ Engine.prototype.insertRemoteCommand = function (cmd) {
   // Testing purposes only
   //
   this.insertCommand(cmd);
-  var prev_frame_time, amtafter = this.framestack.length - 1;
+  var prev_frame_time,
+      amtafter = this.framestack.length - 1;
   for (var i in this.framestack) {
     if (this.framestack[i]._time < cmd._time) {
       amtafter = i;
-      LogUtils.log("frame #" + i, this.framestack[i]._time, cmd._time);
       prev_frame_time = this.framestack[i]._time;
       break;
     }
   }
   if (cmd._time > this.currentSimTime) {
-    // the command is from the future
+    // the command is from the future (!)
     return;
   }
-  this.framestack.splice(0, amtafter);
+  this.framestack.splice(0, amtafter); // get rid of newly obsolete frames
   this.entities = Utils.deepCopy(this.framestack[0].entities);
   this.system_data = Utils.deepCopy(this.framestack[0].system_data);
   var old_time = this.currentSimTime;
@@ -256,11 +266,10 @@ Engine.prototype.insertRemoteCommand = function (cmd) {
   this.stepFrame(old_time);
 }
 
-Engine.prototype.getMatchingEntities = function (sys, frame) {
-  frame = frame || this;
+Engine.prototype.getMatchingEntities = function (sys) {
   var matching_ents = {};
-  for (var e in frame.entities) {
-    var ent = frame.entities[e];
+  for (var e in this.entities) {
+    var ent = this.entities[e];
     if (sys.matches(ent)) {
       matching_ents[e] = ent;
     }
@@ -268,14 +277,14 @@ Engine.prototype.getMatchingEntities = function (sys, frame) {
   return matching_ents;
 }
 
-Engine.prototype.runFrame = function (delta, frame) {
+Engine.prototype.runFrame = function (delta) {
   //LogUtils.log("runframe " + delta);
   for (var i in this.tickers) {
     var sys_type = this.tickers[i];
     var sys = this.systems[sys_type];
-    var wasChange = frame.system_data.was_change_since[sys_type];
-    frame.system_data.was_change_since[sys_type] = false;
-    sys.tick(this.getMatchingEntities(sys, frame), delta, wasChange);
+    var wasChange = this.system_data.was_change_since[sys_type];
+    this.system_data.was_change_since[sys_type] = false;
+    sys.tick(this.getMatchingEntities(sys), delta, wasChange);
   }
 }
 
@@ -356,7 +365,7 @@ Engine.prototype.executeCommand = function (cmd) {
 
 Engine.prototype.stepFrame = function (target_time, extrapolate) {
   //LogUtils.log("stepFrame " + target_time);
-  var last_sim_time = this.currentSimTime;
+  var last_sim_time = this.currentSimTime; // using sim time maintains fixed internal time step
   var target_sim_time = Math.floor(target_time / MS_PER_FRAME) * MS_PER_FRAME;
   var commands = this.intervalCommands(last_sim_time, target_sim_time);
   for (var i = last_sim_time; i < target_sim_time; i += MS_PER_FRAME) {
@@ -367,14 +376,14 @@ Engine.prototype.stepFrame = function (target_time, extrapolate) {
       var cmd = commands[c];
       if ((prev_time <= cmd._time) && (cmd._time < next_time)) {
         var d = cmd._time - prev_time;
-        this.runFrame(d, this);
+        this.runFrame(d);
         this.executeCommand(cmd);
         prev_time = cmd._time;
         step -= d;
       }
     }
-    this.runFrame(step, this);
-    if (!(next_time % 1000)) this.dumpFrame(next_time);
+    this.runFrame(step);
+    if (!(next_time % 1000)) this.dumpFrame(next_time); // keyframes every second
   }
   if (extrapolate) {
     this.render_frame = this.getFrame(target_sim_time);
@@ -389,38 +398,6 @@ Engine.prototype.intervalCommands = function (start, end) { // [start, end)
     return (start <= cmd._time) && (cmd._time < end);
   });
 }
-
-/*Engine.prototype.stepFrame = function (delta, skipcmds) { // (delta in ms, *dump at end?) -> undefined
-  //LogUtils.log("stepFrame " + delta);
-  var last_time = this.currentFrameTime,
-      last_sim_time = this.currentSimTime;
-  var target_time = last_time + delta;
-  var target_sim_time = Math.floor(target_time / MS_PER_FRAME) * MS_PER_FRAME;
-  var found_cmd = false;
-  if (!skipcmds) {
-    for (var i = this.commands.length - 1; i >= 0; i--) { // iterate from oldest to newest
-      var cmd = this.commands[i];
-      if (cmd._time > last_time && cmd._time < target_time) {
-        found_cmd = true;
-        this.stepFrame(cmd._time - last_time, true);
-        if (!this.executeCommand(cmd)) {
-          LogUtils.log("Command failed");
-          failed_commands.push(cmd);
-        }
-        this.dumpFrame(cmd._time);
-        last_time = cmd._time;
-      }
-    }
-  }
-  var keyframe_time = Math.ceil(last_time / 1000) * 1000;
-  if ((!found_cmd || skipcmds) && target_time > keyframe_time) {
-    this.stepFrame(keyframe_time - last_time, true);
-    this.dumpFrame(keyframe_time);
-    last_time = keyframe_time;
-  }
-  this.runFrame(target_time - last_time);
-  this.currentFrameTime = target_time;
-} */
 
 Engine.prototype.getFrame = function (time) {
   return {
@@ -439,19 +416,20 @@ Engine.prototype.dumpFrame = function (time) { // (time to stamp) -> undefined
 
 Engine.prototype.extrapolateValues = function(frame, delta) {
   var delta_secs = delta/1000;
+  frame.entities = $.extend({}, frame.entities); // only copy necessary objects
   for (var i in frame.entities) {
     var ent = frame.entities[i];
     if (ent["Extrapolation"]) {
+      if (!ent._isCopy) ent = frame.entities[i] = $.extend({_isCopy: true}, ent); // faster than deep copy entire frame
       for (var r in ent["Extrapolation"].rates) {
         var path = r.split("."),
             containing = ent,
             p = 0;
         for (var stop = path.length - 1; p < stop; p++) {
-          containing = containing[path[p]];
+          var key = path[p];
+          if (!containing[key]._isCopy) containing[key] = $.extend({_isCopy: true}, containing[path[p]]);
+          containing = containing[key];
         }
-        /*if (Math.random() < 0.1) {
-          LogUtils.log("extrapolate to", containing[path[p]] + ent["Extrapolation"].rates[r] * delta_secs, "in", containing, path[p]);
-        } */
         containing[path[p]] += ent["Extrapolation"].rates[r] * delta_secs;
       }
     }
@@ -459,14 +437,13 @@ Engine.prototype.extrapolateValues = function(frame, delta) {
 }
 
 Engine.prototype.render = function () {
-   var frame = {
+  var frame = {
     _time: this.currentFrameTime,
     entities: this.entities,
     system_data: this.system_data
   };
   var timediff = this.currentFrameTime - this.currentSimTime;
   if (timediff > 1) {
-    frame = Utils.deepCopy(frame);
     this.extrapolateValues(frame, timediff);
   }
   for (var i in this.renderers) {

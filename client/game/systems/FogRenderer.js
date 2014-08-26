@@ -1,11 +1,12 @@
 FogRenderer = function (engine) {
   this.type = "Fog";
   this.engine = engine;
+  this.startup_index = 10;
 }
 
 FogRenderer.prototype.startup = function () {
   var fogGraphics = new PIXI.Graphics();
-  var fogTexture = new PIXI.RenderTexture(WORLD_WIDTH, WORLD_HEIGHT);
+  var fogTexture = new PIXI.RenderTexture(WORLD_WIDTH, WORLD_HEIGHT); // faster than .generateTexture()
   var fogSprite = new PIXI.Sprite(fogTexture);
   World.addChild(fogSprite);
   fogSprite.blendMode = PIXI.blendModes.ADD;

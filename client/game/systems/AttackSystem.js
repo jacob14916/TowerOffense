@@ -1,6 +1,7 @@
 AttackSystem = function (engine) {
   this.engine = engine;
   this.type = "Attack";
+  this.startup_index = 4;
 }
 
 AttackSystem.prototype.startup = function () {
@@ -18,20 +19,25 @@ AttackSystem.prototype.startup = function () {
   };
 }
 
-AttackSystem.scoreTarget = function (ent_pos, tgt) { // lower is better
+AttackSystem.scoreTarget = function (ent_pos, ent_attack, tgt) { // lower is better
   var lnk = tgt["Linkage"]; // no unlinked enemies yet
   if (lnk.isRoot) return 0;
   var score = 100;
   score += Geometry.distance(ent_pos, tgt["Position"].position) / 10;
   if (!lnk.isLinked) return score;
   if (lnk.active) {
-    score -= lnk.linkedEntities.length * 10;
+    score -= lnk.linkedEntities.length * 2;
   }
   if (tgt["Attack"]) {
+    score -= 20;
     score -= 2 * tgt["Attack"].damage * tgt["Attack"].regen;
-    score -= tgt["Attack"].charge * 10;
+    score -= tgt["Attack"].charge * 4;
   }
   score -= tgt["Health"].max / 10;
+  if (tgt["Health"].hp >= (ent_attack.damage - 5)) {
+    score -= 15; // non overkill bonus
+    score += tgt ["Health"].hp * 10 / tgt["Health"].max;
+  }
   return score;
 }
 
@@ -53,9 +59,9 @@ AttackSystem.prototype.tick = function (ents, delta, wasChange) { // smarter alg
       var ent_color = ent["Color"].color, ent_pos = ent["Position"].position, r2 = Math.pow(attack.radius, 2);
       var target = this.engine.entities[attack.target] || this.engine.bestEntity(function (tgt) {
         return (tgt["Color"] && tgt["Position"] && tgt["Health"] &&
-               tgt["Color"].color != ent_color &&
-               (Geometry.distanceSquared(ent_pos, tgt["Position"].position) <= r2));
-      }, AttackSystem.scoreTarget.bind(null, ent_pos));
+                tgt["Color"].color != ent_color &&
+                (Geometry.distanceSquared(ent_pos, tgt["Position"].position) <= r2));
+      }, AttackSystem.scoreTarget.bind(null, ent_pos, attack));
       if (target) {
         attack.charge -= 1;
         attack.num_fired++;
@@ -126,6 +132,7 @@ AttackSystem.prototype.render = function (frame) {
 BulletSystem = function (engine) {
   this.engine = engine;
   this.type = "Bullet";
+  this.startup_index = 7;
 }
 
 BulletSystem.prototype.matches = function (ent) {

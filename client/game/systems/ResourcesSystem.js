@@ -1,6 +1,7 @@
 ResourcesSystem = function (engine) {
   this.type = "Resources";
   this.engine = engine;
+  this.startup_index = 2;
 }
 
 ResourcesSystem.prototype.startup = function () {
@@ -15,16 +16,18 @@ ResourcesSystem.prototype.startup = function () {
       resourceGraphics = {};
   resourceLayer.addChild(miningGraphics);
   resourceLayer.addChild(circleBatch);
-  var circle = function (x, y, amt) {
+  var circle = function (pt, amt) {
     return {
-      position: new PIXI.Point(x, y),
+      position: pt,
       amount: amt,
       radius: Math.sqrt(amt),
-      _id: Utils.positionToString(new PIXI.Point(x, y))
+      _id: Utils.positionToString(pt)
     };
   };
-  var addCircle = function (x, y, amt) {
-    var c = circle(x, y, amt);
+  var addCircle = function (pt, amt) {
+    pt.x = Math.round(pt.x);
+    pt.y = Math.round(pt.y);
+    var c = circle(pt , amt);
     data.circles[c._id] = c;
     var sprite = new PIXI.Sprite(circleTexture);
     resourceGraphics[c._id] = sprite;
@@ -32,9 +35,10 @@ ResourcesSystem.prototype.startup = function () {
     sprite.position = c.position;
     circleBatch.addChild(sprite);
   }
-  for (var i = 0; i < 9; i++) {
-    for (var j = 0; j < 9; j++) {
-      addCircle((i - 4) * 300, (j - 4) * 200, 0x100);
+  for (var i = 0; i < 4; i++) {
+    var ctr = Geometry.rotateVec({x: 1000, y:0}, Math.PI * i / 2);
+    for (var j = 0; j < 8; j++) {
+      addCircle(Geometry.rotateVec({x: 500, y: 0}, Math.PI * j / 4, ctr), 576);
     };
   }
   this.engine.system_data[this.type] = data;
@@ -136,12 +140,12 @@ ResourcesSystem.prototype.run = function (cmd) {
       if (!ent) return false;
       var amt = Math.min(ent["Health"].hp / ent["Health"].max, 0.6) * ent["Cost"].cost;
       return [{
-          changeSystemDataValue: {
-            systemType: this.type,
-            systemDataField: field,
-            systemDataFieldValue: colorAmount + amt
-          }
-        }];
+        changeSystemDataValue: {
+          systemType: this.type,
+          systemDataField: field,
+          systemDataFieldValue: colorAmount + amt
+        }
+      }];
   }
 }
 

@@ -16,6 +16,11 @@ Utils.positionToString = function (pos) {
   return "Posx" + pos.x.toString(16) + "y" + pos.y.toString(16);
 }
 
+Utils.stringToPosition = function (str) {
+  var coords = str.slice(4).split("y");
+  return new PIXI.Point(parseInt(coords[0], 16), parseInt(coords[1], 16));
+}
+
 Utils.deterministicConcat = function (str1, str2) {
   if (str1 > str2) {
     return str1 + str2;
@@ -32,28 +37,28 @@ Utils.keysObj = function (obj) {
 }
 
 Utils.anyMatchInArray = function (target, toMatch) { // by user Ian on StackOverflow (some slight modification)
-    var found, targetMap, i, j, cur;
+  var found, targetMap, i, j, cur;
 
-    found = false;
-    targetMap = {};
+  found = false;
+  targetMap = {};
 
-    // Put all values in the `target` array into a map, where
-    //  the keys are the values from the array
-    for (i = 0, j = target.length; i < j; i++) {
-        cur = target[i];
-        targetMap[cur] = true;
-    }
+  // Put all values in the `target` array into a map, where
+  //  the keys are the values from the array
+  for (i = 0, j = target.length; i < j; i++) {
+    cur = target[i];
+    targetMap[cur] = true;
+  }
 
-    // Loop over all items in the `toMatch` array and see if any of
-    //  their values are in the map from before
-    for (i = 0, j = toMatch.length; !found && (i < j); i++) {
-        cur = toMatch[i];
-        found = !!targetMap[cur];
-        // If found, `targetMap[cur]` will return true, otherwise it
-        //  will return `undefined`...that's what the `!!` is for
-    }
+  // Loop over all items in the `toMatch` array and see if any of
+  //  their values are in the map from before
+  for (i = 0, j = toMatch.length; !found && (i < j); i++) {
+    cur = toMatch[i];
+    found = !!targetMap[cur];
+    // If found, `targetMap[cur]` will return true, otherwise it
+    //  will return `undefined`...that's what the `!!` is for
+  }
 
-    return found;
+  return found;
 };
 
 Utils.removeChildrenExcept = function (container, except) {
@@ -123,6 +128,11 @@ Geometry.subtract = function (pt1, pt2) {
   return new PIXI.Point(pt1.x - pt2.x, pt1.y - pt2.y);
 }
 
+Geometry.floorPoint = function (pt, res) {
+  res = res || 1;
+  return new PIXI.Point(res * Math.floor(pt.x / res), res * Math.floor(pt.y / res));
+}
+
 Geometry.sign = function (x) {
   return x / Math.abs(x);
 }
@@ -143,6 +153,18 @@ Geometry.distanceSquared = function (pt1, pt2) {
 
 Geometry.randomAngle = function () { // Random is unacceptable for deterministic gameplay
   return Math.random() * 2 * Math.PI;
+}
+
+Geometry.rotateVec = function (vec, angle, center) {
+  center = center || {x: 0, y: 0};
+  var cos = Math.cos(angle),
+      sin = Math.sin(angle);
+  return Geometry.add({x: vec.x * cos - vec.y * sin,
+                       y: vec.x * sin + vec.y * cos}, center);
+}
+
+Geometry.rotate = function (pt, angle, center) {
+  return Geometry.rotateVec(Geometry.subtract(pt, center), angle, center);
 }
 
 Geometry.rotationFromUp = function (pt1, pt2) {

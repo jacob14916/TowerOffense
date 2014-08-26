@@ -4,32 +4,22 @@ FOREST_COLOR = 0x40a050;
 TerrainSystem = function (engine) {
   this.type = "Terrain";
   this.engine = engine;
+  this.startup_index = 1;
 };
 
 TerrainSystem.prototype.startup = function () {
-  var lakes = [
-    {position: new PIXI.Point(), radius: 200},
-    {position: new PIXI.Point(200, 0), radius: 100},
-    {position: new PIXI.Point(-200, 0), radius: 100},
-    {position: new PIXI.Point(800, 800), radius: 250},
-    {position: new PIXI.Point(-800, -800), radius: 250},
-    {position: new PIXI.Point(300, -300), radius: 200},
-    {position: new PIXI.Point(-300, 300), radius: 200},
-    {position: new PIXI.Point(500, -500), radius: 200},
-    {position: new PIXI.Point(-500, 500), radius: 200},
-    {position: new PIXI.Point(700, -500), radius: 100},
-    {position: new PIXI.Point(-700, 500), radius: 100}
-  ];
-  var forests = [];
-  for (var i in lakes) {
-    forests.push({
-      position: Geometry.add(lakes[i].position, {x: 350, y: 400}),
-      radius: 300 - lakes[i].radius
+  var lakes = [];
+
+  for (var i = 0; i < 8; i++) {
+    lakes.push({
+      position: new PIXI.Point((i - 3.5) * 400, Math.pow(i - 3.5, 2) * 120),
+      radius: 190
     }, {
-      position: Geometry.add(lakes[i].position, {x: -350, y: -400}),
-      radius: 300 - lakes[i].radius
+      position: new PIXI.Point((i - 3.5) * 400, Math.pow(i - 3.5, 2) * -120),
+      radius: 190
     });
   }
+  var forests = [];
   var terrainLayer = new PIXI.DisplayObjectContainer();
   var lakeGraphics = new PIXI.Graphics(),
       forestGraphics = new PIXI.Graphics();
@@ -76,7 +66,3 @@ TerrainSystem.prototype.run = function (cmd) {
       return true;
   }
 }
-
-/*TerrainSystem.prototype.render = function () {
-  if (this.local_data.)
-};*/

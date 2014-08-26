@@ -1,6 +1,7 @@
 DestroyDeadSystem = function (engine) {
   this.type = "DestroyDead";
   this.engine = engine;
+  this.startup_index = 9;
 }
 
 DestroyDeadSystem.prototype.startup = function () {
@@ -10,7 +11,7 @@ DestroyDeadSystem.prototype.startup = function () {
   assetLoader.onComplete = function () {
     for (var i = 1; i < 27; i++) {
       var texture = PIXI.Texture.fromFrame("Explosion_Sequence_A " + i + ".png");
-		 	explosionTextures.push(texture);
+      explosionTextures.push(texture);
     }
   };
   assetLoader.load();
@@ -65,9 +66,9 @@ DestroyDeadSystem.prototype.render = function () {
 //--------
 
 HealthSystem = function (engine) {
-  //$ work here next
   this.engine = engine;
   this.type = "Health";
+  this.startup_index = 8;
 }
 
 HealthSystem.prototype.startup = function () {
@@ -82,15 +83,18 @@ HealthSystem.prototype.startup = function () {
 }
 
 HealthSystem.prototype.matches = function (ent) {
-  return ent["Position"] && ent["Health"];
+  return ent["Position"] && ent["Health"] && ent["Linkage"];
 }
 
 HealthSystem.prototype.tick = function (ents, delta) {
   var delta_secs = delta / 1000;
   for (var i in ents) {
-    var health = ents[i]["Health"];
-    if (health.hp < health.max && health.hp > 0) {
-      health.hp = Math.min(health.hp + delta_secs * health.regen, health.max);
+    var ent = ents[i];
+    if (ent["Linkage"].isLinked || ent["Linkage"].isRoot) {
+      var health = ents[i]["Health"];
+      if (health.hp < health.max && health.hp > 0) {
+        health.hp = Math.min(health.hp + delta_secs * health.regen, health.max);
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 TowerLinkageSystem = function (engine) {
   this.type = "TowerLinkage";
   this.engine = engine;
+  this.startup_index = 3;
 }
 
 TowerLinkageSystem.prototype.startup = function () {
