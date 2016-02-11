@@ -4,4 +4,6 @@
 - more m0ney on the map
 - get money from killing units
 - fix desynchronization
+- account creation
+- pre-build towers
 ## fix desynchronization
